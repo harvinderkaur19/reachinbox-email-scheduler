@@ -1,10 +1,11 @@
 import { FC } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ComposeForm } from '../components/email/ComposeForm';
-import { UserProfile, ScheduleEmailInput } from '../types/email';
+import { UserProfile, ScheduleEmailInput, EmailItem } from '../types/email';
 
 interface ComposePageProps {
   user: UserProfile;
+  editingEmail?: EmailItem | null;
   activeNav: 'scheduled' | 'sent';
   scheduledCount: number;
   sentCount: number;
@@ -19,6 +20,7 @@ interface ComposePageProps {
 
 export const ComposePage: FC<ComposePageProps> = ({
   user,
+  editingEmail,
   activeNav,
   scheduledCount,
   sentCount,
@@ -44,9 +46,11 @@ export const ComposePage: FC<ComposePageProps> = ({
     >
       <ComposeForm
         user={user}
+        editingEmail={editingEmail}
         onBack={onBack}
         onSubmitSchedule={onSubmitSchedule}
       />
     </AppLayout>
   );
 };
+

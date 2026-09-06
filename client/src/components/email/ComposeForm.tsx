@@ -15,10 +15,12 @@ import { RecipientChip } from './RecipientChip';
 import { EditorToolbar } from './EditorToolbar';
 import { SchedulePopover } from './SchedulePopover';
 import { Button } from '../ui/Button';
-import { UserProfile, ScheduleEmailInput } from '../../types/email';
+import { UserProfile, ScheduleEmailInput, EmailItem } from '../../types/email';
+import { updateScheduledEmailApi } from '../../services/emailService';
 
 interface ComposeFormProps {
   user: UserProfile;
+  editingEmail?: EmailItem | null;
   onBack: () => void;
   onSubmitSchedule: (payload: ScheduleEmailInput) => Promise<void>;
 }
@@ -27,6 +29,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const ComposeForm: FC<ComposeFormProps> = ({
   user,
+  editingEmail,
   onBack,
   onSubmitSchedule,
 }) => {
@@ -36,23 +39,53 @@ export const ComposeForm: FC<ComposeFormProps> = ({
       ? user.senderAccounts[0]
       : null;
 
+  // Extract initial body and attachments if editing an existing scheduled email
+  const parseInitialEmail = () => {
+    if (!editingEmail) {
+      return {
+        recipients: ['alpha@example.com', 'beta@example.com'],
+        subject: 'Q4 Product Release Update',
+        body: 'Hi team,\n\nHere is the latest product update for Q4. Please review the attached schedule and let us know if you have any questions.\n\nBest regards,\nReachInbox Team',
+        attachments: [],
+        scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      };
+    }
+
+    let cleanBody = editingEmail.body || '';
+    let parsedAttachments: any[] = [];
+
+    const attachmentMatch = cleanBody.match(/<!--ATTACHMENTS:(.*?)-->$/s);
+    if (attachmentMatch && attachmentMatch[1]) {
+      try {
+        parsedAttachments = JSON.parse(attachmentMatch[1]);
+        cleanBody = cleanBody.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
+      } catch (e) {}
+    }
+
+    return {
+      recipients: [editingEmail.recipientEmail],
+      subject: editingEmail.subject,
+      body: cleanBody,
+      attachments: parsedAttachments.map((att) => ({
+        name: att.filename,
+        size: Math.round((att.content.length * 3) / 4),
+        type: att.contentType || 'application/octet-stream',
+        base64: att.content,
+      })),
+      scheduledAt: editingEmail.scheduledAt || new Date().toISOString(),
+    };
+  };
+
+  const initialData = parseInitialEmail();
+
   // 2. Form State
-  const [recipients, setRecipients] = useState<string[]>([
-    'alpha@example.com',
-    'beta@example.com',
-  ]);
+  const [recipients, setRecipients] = useState<string[]>(initialData.recipients);
   const [recipientInput, setRecipientInput] = useState<string>('');
-  const [subject, setSubject] = useState<string>('Q4 Product Release Update');
+  const [subject, setSubject] = useState<string>(initialData.subject);
   const [delayBetweenEmails, setDelayBetweenEmails] = useState<number>(10);
   const [hourlyLimit, setHourlyLimit] = useState<number>(100);
-  const [body, setBody] = useState<string>(
-    'Hi team,\n\nHere is the latest product update for Q4. Please review the attached schedule and let us know if you have any questions.\n\nBest regards,\nReachInbox Team'
-  );
-
-  // Default start time: Tomorrow 09:00 AM
-  const defaultStartTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  defaultStartTime.setHours(9, 0, 0, 0);
-  const [scheduledAt, setScheduledAt] = useState<string>(defaultStartTime.toISOString());
+  const [body, setBody] = useState<string>(initialData.body);
+  const [scheduledAt, setScheduledAt] = useState<string>(initialData.scheduledAt);
 
   // UI state
   const [showSendLater, setShowSendLater] = useState<boolean>(false);
@@ -67,7 +100,8 @@ export const ComposeForm: FC<ComposeFormProps> = ({
   // File Attachment State & References
   const [attachedFiles, setAttachedFiles] = useState<
     Array<{ name: string; size: number; type: string; base64: string }>
-  >([]);
+  >(initialData.attachments);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -249,13 +283,25 @@ export const ComposeForm: FC<ComposeFormProps> = ({
 
     try {
       setIsSubmitting(true);
-      await onSubmitSchedule(payload);
+      if (editingEmail) {
+        await updateScheduledEmailApi(editingEmail.id, {
+          subject: payload.subject,
+          body: payload.body,
+          recipientEmail: payload.recipients[0],
+          scheduledAt: payload.startTime,
+          attachments: payload.attachments,
+        });
+        onBack();
+      } else {
+        await onSubmitSchedule(payload);
+      }
     } catch (err: any) {
       setFormError(err.message || 'Failed to schedule campaign');
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-[600px]">

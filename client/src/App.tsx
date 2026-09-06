@@ -15,13 +15,15 @@ export function App() {
   const [view, setView] = useState<'dashboard' | 'compose' | 'detail'>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
-  
+  const [editingEmail, setEditingEmail] = useState<EmailItem | null>(null);
+
   // Real Backend Email Data & Pagination State
   const [emails, setEmails] = useState<EmailItem[]>([]);
   const [scheduledCount, setScheduledCount] = useState<number>(0);
   const [sentCount, setSentCount] = useState<number>(0);
   const [isFetchingEmails, setIsFetchingEmails] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
 
   // Verify active application session or exchange one-time handoff token on startup
   useEffect(() => {
@@ -227,9 +229,16 @@ export function App() {
     setActiveNav(nav);
     setView('dashboard');
     setSelectedEmail(null);
+    setEditingEmail(null);
   };
 
   const handleOpenCompose = () => {
+    setEditingEmail(null);
+    setView('compose');
+  };
+
+  const handleStartEdit = (email: EmailItem) => {
+    setEditingEmail(email);
     setView('compose');
   };
 
@@ -239,9 +248,13 @@ export function App() {
   };
 
   const handleBackToDashboard = () => {
-    setView('dashboard');
+    setEditingEmail(null);
     setSelectedEmail(null);
+    setView('dashboard');
+    loadDashboardData(activeNav);
   };
+
+
 
   const handleToggleStar = (emailId: string) => {
     setEmails(
@@ -285,6 +298,7 @@ export function App() {
     return (
       <ComposePage
         user={user}
+        editingEmail={editingEmail}
         activeNav={activeNav}
         scheduledCount={scheduledCount}
         sentCount={sentCount}
@@ -313,10 +327,12 @@ export function App() {
         onNavigate={handleNavigate}
         onOpenCompose={handleOpenCompose}
         onBack={handleBackToDashboard}
+        onEdit={handleStartEdit}
         onLogout={handleLogout}
       />
     );
   }
+
 
   // 5. Default: Render Dashboard View (Scheduled or Sent)
   return (

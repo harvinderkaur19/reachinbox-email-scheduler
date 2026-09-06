@@ -131,3 +131,81 @@ export const scheduleCampaignService = async (
     indexingStatus,
   };
 };
+
+/**
+ * Updates an existing scheduled email record, preserving existing attachments if not explicitly replaced,
+ * and re-queues the updated BullMQ job.
+ */
+export const updateScheduledEmailService = async (
+  userId: string,
+  emailId: string,
+  input: {
+    subject?: string;
+    body?: string;
+    recipientEmail?: string;
+    scheduledAt?: string;
+    attachments?: Array<{ filename: string; contentType?: string; content: string }>;
+  }
+) => {
+  const prisma = getPrismaClient();
+
+  const email = await prisma.email.findUnique({
+    where: { id: emailId },
+    include: { campaign: true },
+  });
+
+  if (!email || email.campaign.userId !== userId) {
+    throw new ServiceError('Scheduled email record not found or unauthorized', 404);
+  }
+
+  if (email.status === 'SENT' || email.status === 'PROCESSING') {
+    throw new ServiceError('Cannot edit an email that is currently being processed or already sent', 400);
+  }
+
+  let finalBody = email.body;
+
+  // Handle body update & attachment preservation rules
+  if (input.body !== undefined || input.attachments !== undefined) {
+    // Determine existing attachments if input.attachments is not explicitly provided
+    let currentAttachments: any[] = [];
+    const existingMatch = email.body.match(/<!--ATTACHMENTS:(.*?)-->$/s);
+    const cleanTextBody = email.body.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
+
+    if (existingMatch && existingMatch[1]) {
+      try {
+        currentAttachments = JSON.parse(existingMatch[1]);
+      } catch (err) {}
+    }
+
+    const textToUse = input.body !== undefined ? input.body.trim() : cleanTextBody;
+    const attachmentsToUse = input.attachments !== undefined ? input.attachments : currentAttachments;
+
+    finalBody = attachmentsToUse && attachmentsToUse.length > 0
+      ? `${textToUse}\n\n<!--ATTACHMENTS:${JSON.stringify(attachmentsToUse)}-->`
+      : textToUse;
+  }
+
+  const updatedScheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : email.scheduledAt;
+
+  // Update MySQL record
+  const updatedEmail = await prisma.email.update({
+    where: { id: emailId },
+    data: {
+      subject: input.subject !== undefined ? input.subject.trim() : email.subject,
+      body: finalBody,
+      recipientEmail: input.recipientEmail !== undefined ? input.recipientEmail.trim() : email.recipientEmail,
+      scheduledAt: updatedScheduledAt,
+      status: 'SCHEDULED',
+      failureReason: null,
+    },
+  });
+
+  console.log(`[SCHEDULE] Campaign updated in database for email ID ${emailId}`);
+
+  // Re-queue updated job
+  const job = await scheduleEmailJob(emailId, updatedScheduledAt);
+  console.log(`[SCHEDULE] Job ID ${job.id} re-queued for scheduled timestamp ${updatedScheduledAt.toISOString()}`);
+
+  return updatedEmail;
+};
+

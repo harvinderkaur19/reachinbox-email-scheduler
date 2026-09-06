@@ -4,6 +4,7 @@ import { validateRequestBody } from '../middleware/validate';
 import { scheduleEmailSchema } from '../utils/validation/emailValidation';
 import {
   scheduleEmail,
+  updateScheduledEmail,
   searchEmails,
   getScheduledEmails,
   getSentEmails,
@@ -17,6 +18,13 @@ router.post(
   authenticateUser,
   validateRequestBody(scheduleEmailSchema),
   scheduleEmail
+);
+
+// PUT /api/emails/:id
+router.put(
+  '/:id',
+  authenticateUser,
+  updateScheduledEmail
 );
 
 // GET /api/emails/search?q=<query>
@@ -41,3 +49,4 @@ router.get(
 );
 
 export default router;
+

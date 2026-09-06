@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { scheduleCampaignService } from '../services/emailSchedulingService';
+import { scheduleCampaignService, updateScheduledEmailService, ServiceError as SchedulingServiceError } from '../services/emailSchedulingService';
 import { searchEmails as searchEmailsService, ServiceError as ElasticServiceError } from '../services/elasticsearchService';
 import {
   parsePaginationParams,
@@ -41,7 +41,7 @@ export const scheduleEmail = async (req: Request, res: Response): Promise<void> 
     };
     res.status(201).json(response);
   } catch (error) {
-    if (error instanceof ElasticServiceError || error instanceof ReadServiceError) {
+    if (error instanceof ElasticServiceError || error instanceof ReadServiceError || error instanceof SchedulingServiceError) {
       res.status(error.statusCode).json({
         success: false,
         message: error.message,
@@ -53,6 +53,41 @@ export const scheduleEmail = async (req: Request, res: Response): Promise<void> 
     res.status(500).json({
       success: false,
       message: 'Internal server error while scheduling email campaign',
+    });
+  }
+};
+
+export const updateScheduledEmail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized: User context missing',
+      });
+      return;
+    }
+
+    const emailId = req.params.id;
+    const result = await updateScheduledEmailService(req.user.id, emailId, req.body);
+
+    res.status(200).json({
+      success: true,
+      message: 'Scheduled email updated successfully',
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof SchedulingServiceError || error instanceof ReadServiceError || error instanceof ElasticServiceError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
+    console.error('[EmailController] Unexpected error in updateScheduledEmail:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while updating scheduled email',
     });
   }
 };
@@ -158,3 +193,4 @@ export const getSentEmails = async (req: Request, res: Response): Promise<void> 
     });
   }
 };
+

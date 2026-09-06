@@ -14,6 +14,7 @@ interface EmailDetailPageProps {
   onNavigate: (nav: 'scheduled' | 'sent') => void;
   onOpenCompose: () => void;
   onBack: () => void;
+  onEdit?: (email: EmailItem) => void;
   onLogout: () => void;
 }
 
@@ -28,6 +29,7 @@ export const EmailDetailPage: FC<EmailDetailPageProps> = ({
   onNavigate,
   onOpenCompose,
   onBack,
+  onEdit,
   onLogout,
 }) => {
   return (
@@ -42,7 +44,8 @@ export const EmailDetailPage: FC<EmailDetailPageProps> = ({
       onOpenCompose={onOpenCompose}
       onLogout={onLogout}
     >
-      <EmailDetail email={email} user={user} onBack={onBack} />
+      <EmailDetail email={email} user={user} onBack={onBack} onEdit={onEdit} />
     </AppLayout>
   );
 };
+

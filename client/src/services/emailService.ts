@@ -149,3 +149,36 @@ export const searchEmails = async (
   return payload.data;
 };
 
+/**
+ * Updates an existing scheduled email record via PUT /api/emails/:id.
+ */
+export const updateScheduledEmailApi = async (
+  emailId: string,
+  inputPayload: any
+): Promise<any> => {
+  const url = `${API_BASE_URL}/api/emails/${emailId}`;
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+    body: JSON.stringify(inputPayload),
+  });
+
+  if (response.status === 401) {
+    throw new ApiError('Unauthenticated session', 401);
+  }
+
+  const payload = await response.json();
+
+  if (!response.ok || !payload.success) {
+    throw new ApiError(
+      payload.message || `Failed to update scheduled email (HTTP ${response.status})`,
+      response.status
+    );
+  }
+
+  return payload.data;
+};
+
+
+

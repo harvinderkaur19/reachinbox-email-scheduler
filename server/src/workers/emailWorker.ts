@@ -6,6 +6,7 @@ import { EMAIL_SCHEDULER_QUEUE_NAME, EmailJobData } from '../types';
 import { getPrismaClient } from '../utils/prisma';
 import { sendEmail } from '../integrations/smtpIntegration';
 import { checkAndReserveSendSlot } from '../services/rateLimitService';
+import { notifySlackHourlyRateLimit } from '../services/slackNotificationService';
 
 export const createEmailWorker = (): Worker<EmailJobData> => {
   const prisma = getPrismaClient();
@@ -88,6 +89,13 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
         console.log(
           `[EmailWorker] Hourly rate limit reached for sender ${senderAccountId} (count: ${rateLimitResult.currentCount}/${config.MAX_EMAILS_PER_HOUR_PER_SENDER}). Rescheduling email ${emailId} to next hour window: ${new Date(rescheduleTimestamp).toISOString()}`
         );
+
+        // Attempt Slack Rate Limit Notification (fail-safe)
+        await notifySlackHourlyRateLimit({
+          senderAccountId,
+          senderEmail: email.senderAccount?.email || senderAccountId,
+          hourlyLimit: config.MAX_EMAILS_PER_HOUR_PER_SENDER,
+        });
 
         // Reset DB status to SCHEDULED for next window
         await prisma.email.update({

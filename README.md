@@ -70,9 +70,9 @@ cd client
 npm install
 npm run dev
 ```
-
 The frontend client application will run at `http://localhost:5173`.
 
+<<<<<<< HEAD
 ## Production Deployment Guide
 
 ### Deployment Architecture
@@ -132,3 +132,22 @@ The frontend client application will run at `http://localhost:5173`.
 | Variable | Description | Example |
 |---|---|---|
 | `VITE_API_URL` | Backend production API URL | `https://reachinbox-api.onrender.com` |
+=======
+#### Run API server:
+```bash
+npm run dev
+```
+
+### Run BullMQ worker in a separate terminal:
+```bash
+npm run worker
+```
+
+
+## Placeholder / Future Roadmap Sections
+- [ ] Database Schema & Migrations
+- [ ] Queue System & Background Workers
+- [ ] Email Provider Integration & Rate Limiting
+- [ ] Authentication & User Management
+- [ ] Analytics & Dashboard UI
+>>>>>>> aa7d3524c2f01867d3167d760cdb080db6b21b76

@@ -61,9 +61,11 @@ export const createSession = async (res: Response, userId: string): Promise<stri
 
   if (useSecureCrossOrigin) {
     cookieParts.push('Secure');
+    cookieParts.push('Partitioned'); // CHIPS support for cross-site third-party cookie persistence
   }
 
   res.setHeader('Set-Cookie', cookieParts.join('; '));
+  console.log(`[Session] Created session for user. CrossOrigin: ${useSecureCrossOrigin}, SameSite: ${sameSiteMode}, Partitioned: ${useSecureCrossOrigin}`);
   return sessionId;
 };
 
@@ -71,13 +73,25 @@ export const createSession = async (res: Response, userId: string): Promise<stri
  * Retrieves the session payload from Redis using the sid cookie from the request header.
  */
 export const getSession = async (cookieHeader?: string): Promise<{ userId: string } | null> => {
+  const hasCookieHeader = Boolean(cookieHeader);
   const cookies = parseCookies(cookieHeader);
-  const sessionId = cookies.sid;
-  if (!sessionId) return null;
+  const hasSid = Boolean(cookies.sid);
+
+  if (!hasSid) {
+    if (!hasCookieHeader) {
+      console.log('[Session] getSession check: Request contains no Cookie header');
+    } else {
+      console.log('[Session] getSession check: Cookie header present, but "sid" cookie missing');
+    }
+    return null;
+  }
 
   const redis = getRedisClient();
-  const rawSession = await redis.get(`session:${sessionId}`);
-  if (!rawSession) return null;
+  const rawSession = await redis.get(`session:${cookies.sid}`);
+  if (!rawSession) {
+    console.log('[Session] getSession check: "sid" cookie present, but session key not found in Redis (expired or invalid)');
+    return null;
+  }
 
   try {
     const data = JSON.parse(rawSession);
@@ -116,6 +130,7 @@ export const destroySession = async (req: Request, res: Response): Promise<void>
 
   if (useSecureCrossOrigin) {
     cookieParts.push('Secure');
+    cookieParts.push('Partitioned');
   }
 
   res.setHeader('Set-Cookie', cookieParts.join('; '));

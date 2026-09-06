@@ -7,6 +7,9 @@ import authRoutes from './routes/authRoutes';
 
 const app: Express = express();
 
+// Trust Railway / cloud reverse proxy headers (X-Forwarded-Proto, X-Forwarded-For)
+app.set('trust proxy', 1);
+
 // CORS Middleware with credentials enabled for cross-origin session cookies
 app.use(
   cors({

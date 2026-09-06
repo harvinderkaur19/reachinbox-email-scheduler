@@ -59,9 +59,11 @@ export const googleAuthCallback = async (req: Request, res: Response): Promise<v
 
     // Deterministic user upsert in Prisma MySQL
     const user = await upsertGoogleUser(googleProfile);
+    console.log(`[AuthController] Google profile verified and user record upserted successfully.`);
 
     // Create Redis-backed opaque session & set HTTP-only cookie
     await createSession(res, user.id);
+    console.log(`[AuthController] Session established in Redis and Set-Cookie header set. Redirecting to: ${config.CLIENT_URL}`);
 
     // Redirect browser to frontend dashboard
     res.redirect(config.CLIENT_URL);
@@ -77,12 +79,15 @@ export const googleAuthCallback = async (req: Request, res: Response): Promise<v
  */
 export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
+    console.log('[AuthController] GET /api/auth/me called without authenticated req.user context');
     res.status(401).json({
       success: false,
       error: 'Unauthenticated',
     });
     return;
   }
+
+  console.log('[AuthController] GET /api/auth/me succeeded for authenticated session.');
 
   const prisma = getPrismaClient();
   const senderAccounts = await prisma.senderAccount.findMany({

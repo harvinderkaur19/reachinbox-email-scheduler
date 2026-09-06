@@ -12,7 +12,14 @@ export const authenticateUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const session = await getSession(req.headers.cookie);
+    const authHeader =
+      req.headers.authorization ||
+      (req.headers['x-session-token'] as string) ||
+      (req.query.session_token as string);
+
+    const tokenFallback = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : undefined;
+
+    const session = await getSession(req.headers.cookie, tokenFallback);
     if (!session) {
       res.status(401).json({
         success: false,

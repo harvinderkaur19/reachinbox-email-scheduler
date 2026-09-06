@@ -70,28 +70,13 @@ export const createSession = async (res: Response, userId: string): Promise<stri
 };
 
 /**
- * Retrieves the session payload from Redis using the sid cookie from the request header.
+ * Retrieves the session payload from Redis using a direct session ID token string.
  */
-export const getSession = async (cookieHeader?: string): Promise<{ userId: string } | null> => {
-  const hasCookieHeader = Boolean(cookieHeader);
-  const cookies = parseCookies(cookieHeader);
-  const hasSid = Boolean(cookies.sid);
-
-  if (!hasSid) {
-    if (!hasCookieHeader) {
-      console.log('[Session] getSession check: Request contains no Cookie header');
-    } else {
-      console.log('[Session] getSession check: Cookie header present, but "sid" cookie missing');
-    }
-    return null;
-  }
-
+export const getSessionFromToken = async (token?: string): Promise<{ userId: string } | null> => {
+  if (!token || typeof token !== 'string') return null;
   const redis = getRedisClient();
-  const rawSession = await redis.get(`session:${cookies.sid}`);
-  if (!rawSession) {
-    console.log('[Session] getSession check: "sid" cookie present, but session key not found in Redis (expired or invalid)');
-    return null;
-  }
+  const rawSession = await redis.get(`session:${token}`);
+  if (!rawSession) return null;
 
   try {
     const data = JSON.parse(rawSession);
@@ -103,6 +88,37 @@ export const getSession = async (cookieHeader?: string): Promise<{ userId: strin
   }
 
   return null;
+};
+
+/**
+ * Retrieves the session payload from Redis using the sid cookie from the request header
+ * or an optional fallback session token string (e.g. Authorization header or query token).
+ */
+export const getSession = async (
+  cookieHeader?: string,
+  tokenFallback?: string
+): Promise<{ userId: string } | null> => {
+  const hasCookieHeader = Boolean(cookieHeader);
+  const cookies = parseCookies(cookieHeader);
+  const sessionId = cookies.sid || tokenFallback;
+
+  if (!sessionId) {
+    if (!hasCookieHeader && !tokenFallback) {
+      console.log('[Session] getSession check: Request contains no Cookie header and no session token fallback');
+    } else {
+      console.log('[Session] getSession check: Header/Cookie present, but "sid" session ID is missing');
+    }
+    return null;
+  }
+
+  const session = await getSessionFromToken(sessionId);
+  if (!session) {
+    console.log('[Session] getSession check: Session ID token present, but key not found in Redis (expired or invalid)');
+    return null;
+  }
+
+  console.log(`[Session] getSession check: Valid session resolved for userId: ${session.userId}`);
+  return session;
 };
 
 /**

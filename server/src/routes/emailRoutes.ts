@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { resolveDevUser } from '../middleware/auth';
 import { validateRequestBody } from '../middleware/validate';
 import { scheduleEmailSchema } from '../utils/validation/emailValidation';
-import { scheduleEmail } from '../controllers/emailController';
+import { scheduleEmail, searchEmails } from '../controllers/emailController';
 
 const router = Router();
 
@@ -12,6 +12,13 @@ router.post(
   resolveDevUser,
   validateRequestBody(scheduleEmailSchema),
   scheduleEmail
+);
+
+// GET /api/emails/search?q=<query>
+router.get(
+  '/search',
+  resolveDevUser,
+  searchEmails
 );
 
 export default router;

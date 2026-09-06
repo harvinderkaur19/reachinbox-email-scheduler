@@ -38,12 +38,19 @@ export interface QueueFailureItem {
   error: string;
 }
 
+export interface IndexingStatusItem {
+  success: boolean;
+  indexedCount: number;
+  error?: string;
+}
+
 export interface ScheduleCampaignResponse {
   campaignId: string;
   scheduledCount: number;
   queuedCount: number;
   scheduledEmails: ScheduledEmailItem[];
   queueFailures?: QueueFailureItem[];
+  indexingStatus?: IndexingStatusItem;
 }
 
 declare global {

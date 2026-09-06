@@ -7,6 +7,7 @@ import { getPrismaClient } from '../utils/prisma';
 import { sendEmail } from '../integrations/smtpIntegration';
 import { checkAndReserveSendSlot } from '../services/rateLimitService';
 import { notifySlackHourlyRateLimit } from '../services/slackNotificationService';
+import { updateElasticEmailStatus } from '../services/elasticsearchService';
 
 export const createEmailWorker = (): Worker<EmailJobData> => {
   const prisma = getPrismaClient();
@@ -58,6 +59,9 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
         return;
       }
 
+      // Sync claim status PROCESSING to Elasticsearch (non-fatal)
+      await updateElasticEmailStatus(emailId, 'PROCESSING');
+
       // 4. Enforce Distributed Rate Limiting & Send Spacing per Sender
       const senderAccountId = email.senderAccountId || 'default-sender';
       let rateLimitResult;
@@ -78,6 +82,9 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
             failureReason: `Redis rate limit failure: ${redisErrMsg}`,
           },
         });
+
+        // Sync FAILED status to Elasticsearch
+        await updateElasticEmailStatus(emailId, 'FAILED', { failureReason: redisErrMsg });
 
         // Fail job in a retryable manner so BullMQ exponential retry handles it without sending unprotected email
         throw redisErr;
@@ -102,6 +109,9 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
           where: { id: emailId },
           data: { status: 'SCHEDULED' },
         });
+
+        // Sync SCHEDULED status to Elasticsearch
+        await updateElasticEmailStatus(emailId, 'SCHEDULED');
 
         // Reschedule job in BullMQ to delayed state
         await job.moveToDelayed(rescheduleTimestamp, job.token);
@@ -129,15 +139,20 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
           body: email.body,
         });
 
+        const sentDate = new Date();
+
         // 8. On Success: Update status = SENT, sentAt = now, clear failureReason
         await prisma.email.update({
           where: { id: emailId },
           data: {
             status: 'SENT',
-            sentAt: new Date(),
+            sentAt: sentDate,
             failureReason: null,
           },
         });
+
+        // Sync SENT status to Elasticsearch (non-fatal)
+        await updateElasticEmailStatus(emailId, 'SENT', { sentAt: sentDate });
 
         console.log(
           `[EmailWorker] Email ${emailId} successfully sent to ${email.recipientEmail} (Sender: ${senderAccountId}, HourlyCount: ${rateLimitResult.currentCount}). MessageId: ${result.messageId}`
@@ -157,6 +172,9 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
             failureReason: errorMessage,
           },
         });
+
+        // Sync FAILED status to Elasticsearch
+        await updateElasticEmailStatus(emailId, 'FAILED', { failureReason: errorMessage });
 
         // Rethrow so BullMQ triggers exponential backoff retry
         throw error;

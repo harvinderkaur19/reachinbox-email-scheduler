@@ -1,5 +1,6 @@
 import { getPrismaClient } from '../utils/prisma';
 import { scheduleEmailJob } from './schedulerService';
+import { indexEmails } from './elasticsearchService';
 import { ScheduleEmailInput } from '../utils/validation/emailValidation';
 import { ScheduleCampaignResponse, ScheduledEmailItem, QueueFailureItem } from '../types';
 
@@ -14,11 +15,11 @@ export class ServiceError extends Error {
 }
 
 /**
- * Orchestrates campaign creation, email persistence, and BullMQ job scheduling.
+ * Orchestrates campaign creation, email persistence, BullMQ job scheduling, and Elasticsearch indexing.
  *
  * @param userId - ID of the authenticated/development user.
  * @param input - Validated schedule request DTO.
- * @returns Structured result containing campaignId, scheduledCount, queuedCount, emails, and any queueFailures.
+ * @returns Structured result containing campaignId, scheduledCount, queuedCount, emails, queueFailures, and indexingStatus.
  */
 export const scheduleCampaignService = async (
   userId: string,
@@ -112,11 +113,15 @@ export const scheduleCampaignService = async (
     }
   }
 
+  // 4. Index created Emails into Elasticsearch (non-fatal, post-transaction)
+  const indexingStatus = await indexEmails(createdEmails, userId);
+
   return {
     campaignId: campaign.id,
     scheduledCount: createdEmails.length,
     queuedCount: scheduledEmails.length,
     scheduledEmails,
     queueFailures: queueFailures.length > 0 ? queueFailures : undefined,
+    indexingStatus,
   };
 };

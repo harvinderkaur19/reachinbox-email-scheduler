@@ -1,0 +1,128 @@
+// This is your Prisma schema file.
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------
+// Enums
+// ------------------------------------------------------
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum EmailStatus {
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+// ------------------------------------------------------
+// Models
+// ------------------------------------------------------
+
+model User {
+  id             String            @id @default(uuid())
+  googleId       String            @unique
+  email          String            @unique
+  name           String
+  avatarUrl      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  campaigns      Campaign[]
+  senderAccounts SenderAccount[]
+  slack          SlackIntegration?
+}
+
+model Campaign {
+  id                 String         @id @default(uuid())
+  userId             String
+  subject            String
+  body               String         @db.Text
+  startTime          DateTime
+  delayBetweenEmails Int // Delay in seconds between email sends
+  hourlyLimit        Int // Maximum allowed emails per hour
+  status             CampaignStatus @default(DRAFT)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails Email[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model SenderAccount {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  email     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails Email[]
+
+  @@index([userId])
+}
+
+model Email {
+  id              String      @id @default(uuid())
+  campaignId      String
+  senderAccountId String?
+  recipientEmail  String
+  subject         String
+  body            String      @db.Text
+  scheduledAt     DateTime
+  sentAt          DateTime?
+  status          EmailStatus @default(SCHEDULED)
+  failureReason   String?
+
+  // Unique key used to guarantee idempotency and prevent duplicate queue processing or duplicate email sends.
+  idempotencyKey String @unique
+
+  attemptCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  campaign      Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  senderAccount SenderAccount? @relation(fields: [senderAccountId], references: [id], onDelete: SetNull)
+
+  // Prevent duplicate recipients within the same campaign
+  @@unique([campaignId, recipientEmail])
+  // Indexes for dashboard queries and campaign filtering
+  @@index([campaignId])
+  @@index([senderAccountId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([status, scheduledAt])
+}
+
+model SlackIntegration {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  teamId      String
+  teamName    String?
+  accessToken String
+  webhookUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

@@ -5,7 +5,7 @@ import { config } from './config';
 const app: Express = express();
 
 // Middleware
-app.use(cors({ origin: config.clientUrl }));
+app.use(cors({ origin: config.CLIENT_URL }));
 app.use(express.json());
 
 // Health Check Endpoint

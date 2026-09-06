@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Relational Database: MySQL 8.0
+  mysql:
+    image: mysql:8.0
+    container_name: reachinbox-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-reachinbox_secret}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-reachinbox_db}
+      MYSQL_USER: ${MYSQL_USER:-reachinbox}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-reachinbox_secret}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD:-reachinbox_secret}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # In-Memory Cache & Queue Persistence: Redis 7
+  redis:
+    image: redis:7-alpine
+    container_name: reachinbox-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Email Search Indexing Engine: Elasticsearch 8.13.0
+  # NOTE: The configuration options below (xpack.security.enabled=false and discovery.type=single-node)
+  # are strictly intended for LOCAL DEVELOPMENT convenience to avoid SSL/TLS setup overhead.
+  # DO NOT use security-disabled settings in production environments.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: reachinbox-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  es_data:
+    driver: local

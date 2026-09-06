@@ -16,7 +16,16 @@ app.use('/api/auth', authRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/slack', slackRoutes);
 
-// Health Check Endpoint
+// Health & Root Status Endpoints
+app.get('/', (_req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'reachinbox-email-scheduler-server',
+    message: 'ReachInbox Email Scheduler API is running',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',

@@ -1,6 +1,12 @@
 import { Request, Response } from 'express';
 import { scheduleCampaignService } from '../services/emailSchedulingService';
-import { searchEmails as searchEmailsService, ServiceError } from '../services/elasticsearchService';
+import { searchEmails as searchEmailsService, ServiceError as ElasticServiceError } from '../services/elasticsearchService';
+import {
+  parsePaginationParams,
+  getScheduledEmailsService,
+  getSentEmailsService,
+  ServiceError as ReadServiceError,
+} from '../services/emailReadService';
 import { ApiResponse, ScheduleCampaignResponse } from '../types';
 
 export const scheduleEmail = async (req: Request, res: Response): Promise<void> => {
@@ -35,7 +41,7 @@ export const scheduleEmail = async (req: Request, res: Response): Promise<void> 
     };
     res.status(201).json(response);
   } catch (error) {
-    if (error instanceof ServiceError) {
+    if (error instanceof ElasticServiceError || error instanceof ReadServiceError) {
       res.status(error.statusCode).json({
         success: false,
         message: error.message,
@@ -69,7 +75,7 @@ export const searchEmails = async (req: Request, res: Response): Promise<void> =
       data: result,
     });
   } catch (error) {
-    if (error instanceof ServiceError) {
+    if (error instanceof ElasticServiceError || error instanceof ReadServiceError) {
       res.status(error.statusCode).json({
         success: false,
         message: error.message,
@@ -81,6 +87,74 @@ export const searchEmails = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({
       success: false,
       message: 'Internal server error while searching emails',
+    });
+  }
+};
+
+export const getScheduledEmails = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized: User context missing',
+      });
+      return;
+    }
+
+    const { page, limit } = parsePaginationParams(req.query.page, req.query.limit);
+    const result = await getScheduledEmailsService(req.user.id, page, limit);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof ReadServiceError || error instanceof ElasticServiceError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
+    console.error('[EmailController] Unexpected error in getScheduledEmails:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching scheduled emails',
+    });
+  }
+};
+
+export const getSentEmails = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized: User context missing',
+      });
+      return;
+    }
+
+    const { page, limit } = parsePaginationParams(req.query.page, req.query.limit);
+    const result = await getSentEmailsService(req.user.id, page, limit);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof ReadServiceError || error instanceof ElasticServiceError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
+    console.error('[EmailController] Unexpected error in getSentEmails:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching sent emails',
     });
   }
 };

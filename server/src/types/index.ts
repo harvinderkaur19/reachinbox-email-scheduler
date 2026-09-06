@@ -53,6 +53,38 @@ export interface ScheduleCampaignResponse {
   indexingStatus?: IndexingStatusItem;
 }
 
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PaginatedEmailListResponse<T> {
+  emails: T[];
+  pagination: PaginationMeta;
+}
+
+export interface ScheduledEmailListItem {
+  id: string;
+  recipientEmail: string;
+  subject: string;
+  scheduledAt: Date;
+  status: EmailStatus;
+  campaignId: string;
+  createdAt: Date;
+}
+
+export interface SentEmailListItem {
+  id: string;
+  recipientEmail: string;
+  subject: string;
+  sentAt: Date | null;
+  status: EmailStatus;
+  campaignId: string;
+  createdAt: Date;
+}
+
 declare global {
   namespace Express {
     interface Request {

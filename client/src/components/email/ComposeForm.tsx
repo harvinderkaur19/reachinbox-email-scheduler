@@ -327,8 +327,19 @@ export const ComposeForm: FC<ComposeFormProps> = ({
       {/* Scheduled Info Banner */}
       {scheduledAt && (
         <div className="px-6 py-2 bg-green-50 border-b border-green-200 flex items-center justify-between text-xs text-green-900 font-medium">
-          <span>Scheduled Start Time: {new Date(scheduledAt).toLocaleString()}</span>
+          <span>
+            Scheduled Start Time:{' '}
+            {new Date(scheduledAt).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })}
+          </span>
           <button
+            type="button"
             onClick={() => setShowSendLater(true)}
             className="text-green-700 underline hover:text-green-900 text-[11px]"
           >

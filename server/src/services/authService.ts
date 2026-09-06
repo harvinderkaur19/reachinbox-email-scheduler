@@ -163,38 +163,36 @@ export const upsertGoogleUser = async (profile: GoogleUserProfile): Promise<User
         avatarUrl: profile.picture || user.avatarUrl,
       },
     });
-    return user;
-  }
-
-  // 2. Try matching by email
-  user = await prisma.user.findUnique({
-    where: { email: profile.email },
-  });
-
-  if (user) {
-    // Associate googleId and update details
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        googleId: profile.id,
-        name: profile.name || user.name,
-        avatarUrl: profile.picture || user.avatarUrl,
-      },
+  } else {
+    // 2. Try matching by email
+    user = await prisma.user.findUnique({
+      where: { email: profile.email },
     });
-    return user;
+
+    if (user) {
+      // Associate googleId and update details
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId: profile.id,
+          name: profile.name || user.name,
+          avatarUrl: profile.picture || user.avatarUrl,
+        },
+      });
+    } else {
+      // 3. Create new User
+      user = await prisma.user.create({
+        data: {
+          googleId: profile.id,
+          email: profile.email,
+          name: profile.name || profile.email.split('@')[0],
+          avatarUrl: profile.picture || null,
+        },
+      });
+    }
   }
 
-  // 3. Create new User
-  user = await prisma.user.create({
-    data: {
-      googleId: profile.id,
-      email: profile.email,
-      name: profile.name || profile.email.split('@')[0],
-      avatarUrl: profile.picture || null,
-    },
-  });
-
-  // Ensure an active default SenderAccount exists for the provisioned user
+  // Ensure an active default SenderAccount exists for the provisioned user across ALL branches
   await ensureDefaultSenderAccount(user.id, user.name, user.email);
 
   return user;

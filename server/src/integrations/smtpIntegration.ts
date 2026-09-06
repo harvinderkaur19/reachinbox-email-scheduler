@@ -1,12 +1,19 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { config } from '../config';
 
+export interface EmailAttachmentPayload {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+}
+
 export interface SendEmailOptions {
   from?: string;
   to: string;
   subject: string;
   body: string;
   html?: string;
+  attachments?: EmailAttachmentPayload[];
 }
 
 export interface SendEmailResult {
@@ -46,21 +53,32 @@ const getTransporter = async (): Promise<Transporter> => {
 };
 
 /**
- * Sends an email using Nodemailer via Ethereal SMTP transport.
+ * Sends an email using Nodemailer via Ethereal / configured SMTP transport.
  *
- * @param options - Object containing from, to, subject, body (text/html).
+ * @param options - Object containing from, to, subject, body (text/html) and optional attachments.
  * @returns Object containing Nodemailer messageId and Ethereal previewUrl (if applicable).
  */
 export const sendEmail = async (options: SendEmailOptions): Promise<SendEmailResult> => {
   const transporter = await getTransporter();
 
-  const mailOptions = {
+  const formattedAttachments = options.attachments?.map((att) => ({
+    filename: att.filename,
+    content: typeof att.content === 'string' ? Buffer.from(att.content, 'base64') : att.content,
+    contentType: att.contentType || 'application/octet-stream',
+  }));
+
+  const mailOptions: any = {
     from: options.from || '"ReachInbox Email Scheduler" <no-reply@reachinbox.ai>',
     to: options.to,
     subject: options.subject,
     text: options.body,
     html: options.html || `<p>${options.body.replace(/\n/g, '<br/>')}</p>`,
   };
+
+  if (formattedAttachments && formattedAttachments.length > 0) {
+    mailOptions.attachments = formattedAttachments;
+  }
+
 
   const info = await transporter.sendMail(mailOptions);
   const previewUrl = nodemailer.getTestMessageUrl(info);

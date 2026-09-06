@@ -1,5 +1,6 @@
 import { Email } from '@prisma/client';
 import { getElasticClient } from '../utils/elasticsearch';
+import { getPrismaClient } from '../utils/prisma';
 
 export class ServiceError extends Error {
   constructor(
@@ -141,15 +142,16 @@ export const updateElasticEmailStatus = async (
 
 /**
  * Full-text search for emails scoped strictly to the current user ID.
- * Returns HTTP 503 error if Elasticsearch is unavailable.
+ * Automatically falls back to MySQL Prisma search if Elasticsearch is unavailable.
  */
 export const searchEmails = async (
   userId: string,
   query?: string
 ): Promise<{ total: number; query?: string; emails: any[] }> => {
+  const cleanQuery = query ? query.trim() : '';
+
   try {
     const client = getElasticClient();
-    const cleanQuery = query ? query.trim() : '';
 
     const mustClause = cleanQuery
       ? [
@@ -176,7 +178,6 @@ export const searchEmails = async (
 
     const hits = response.hits.hits || [];
     const total = typeof response.hits.total === 'number' ? response.hits.total : response.hits.total?.value || hits.length;
-
     const emails = hits.map((hit: any) => hit._source);
 
     return {
@@ -186,7 +187,56 @@ export const searchEmails = async (
     };
   } catch (err) {
     const errMsg = (err as Error).message;
-    console.error(`⚠️ [ElasticsearchService] Search error for user ${userId}: ${errMsg}`);
-    throw new ServiceError('Search service is currently unavailable', 503);
+    console.warn(`⚠️ [ElasticsearchService] Primary search failed (${errMsg}). Executing Prisma MySQL fallback search for user ${userId}...`);
+
+    try {
+      const prisma = getPrismaClient();
+
+      const whereClause: any = {
+        campaign: {
+          userId,
+        },
+      };
+
+      if (cleanQuery) {
+        whereClause.OR = [
+          { recipientEmail: { contains: cleanQuery } },
+          { subject: { contains: cleanQuery } },
+          { body: { contains: cleanQuery } },
+        ];
+      }
+
+      const dbEmails = await prisma.email.findMany({
+        where: whereClause,
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+
+      const mappedEmails = dbEmails.map((e) => ({
+        id: e.id,
+        campaignId: e.campaignId,
+        recipientEmail: e.recipientEmail,
+        subject: e.subject,
+        body: e.body,
+        status: e.status,
+        scheduledAt: e.scheduledAt?.toISOString() || null,
+        sentAt: e.sentAt?.toISOString() || null,
+        createdAt: e.createdAt.toISOString(),
+      }));
+
+      return {
+        total: mappedEmails.length,
+        query: cleanQuery || undefined,
+        emails: mappedEmails,
+      };
+    } catch (fallbackErr) {
+      console.error(`⚠️ [ElasticsearchService] Prisma MySQL fallback search error:`, fallbackErr);
+      return {
+        total: 0,
+        query: cleanQuery || undefined,
+        emails: [],
+      };
+    }
   }
 };
+

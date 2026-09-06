@@ -56,6 +56,11 @@ export const scheduleCampaignService = async (
       },
     });
 
+    const hasAttachments = Array.isArray(input.attachments) && input.attachments.length > 0;
+    const finalBody = hasAttachments
+      ? `${input.body}\n\n<!--ATTACHMENTS:${JSON.stringify(input.attachments)}-->`
+      : input.body;
+
     const emailsToCreate = input.recipients.map((recipient, index) => {
       // Server-side calculation: startTime + index * delayBetweenEmails (in seconds)
       const scheduledTimeMs = startMs + index * input.delayBetweenEmails * 1000;
@@ -64,13 +69,14 @@ export const scheduleCampaignService = async (
         senderAccountId: senderAccount.id,
         recipientEmail: recipient,
         subject: input.subject,
-        body: input.body,
+        body: finalBody,
         scheduledAt: new Date(scheduledTimeMs),
         status: 'SCHEDULED' as const,
         idempotencyKey: `email-${newCampaign.id}-${recipient}-${index}`,
         attemptCount: 0,
       };
     });
+
 
     // Create Email records in database
     await tx.email.createMany({

@@ -64,7 +64,50 @@ export const ComposeForm: FC<ComposeFormProps> = ({
     count: number;
   } | null>(null);
 
+  // File Attachment State & References
+  const [attachedFiles, setAttachedFiles] = useState<
+    Array<{ name: string; size: number; type: string; base64: string }>
+  >([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAttachmentSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    files.forEach((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        setFormError(`File "${file.name}" exceeds maximum allowed attachment size (5MB).`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const result = evt.target?.result as string;
+        if (!result) return;
+        const base64Data = result.split(',')[1] || '';
+
+        setAttachedFiles((prev) => [
+          ...prev.filter((f) => f.name !== file.name),
+          {
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/octet-stream',
+            base64: base64Data,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveAttachment = (filename: string) => {
+    setAttachedFiles((prev) => prev.filter((f) => f.name !== filename));
+  };
 
   // 3. Recipient Add Handler (Enter, comma, semicolon)
   const addSingleRecipient = (rawInput: string) => {
@@ -174,8 +217,8 @@ export const ComposeForm: FC<ComposeFormProps> = ({
     }
 
     const startTimeMs = new Date(scheduledAt).getTime();
-    if (isNaN(startTimeMs) || startTimeMs <= Date.now()) {
-      setFormError('Start time must be a valid future date and time.');
+    if (isNaN(startTimeMs)) {
+      setFormError('Start time must be a valid date and time.');
       return;
     }
 
@@ -197,6 +240,11 @@ export const ComposeForm: FC<ComposeFormProps> = ({
       startTime: new Date(scheduledAt).toISOString(),
       delayBetweenEmails: Math.floor(delayBetweenEmails),
       hourlyLimit: Math.floor(hourlyLimit),
+      attachments: attachedFiles.map((f) => ({
+        filename: f.name,
+        contentType: f.type,
+        content: f.base64,
+      })),
     };
 
     try {
@@ -211,12 +259,21 @@ export const ComposeForm: FC<ComposeFormProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-[600px]">
-      {/* Hidden File Input for CSV/TXT Upload */}
+      {/* Hidden File Input for CSV/TXT Recipient List Upload */}
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}
         accept=".csv,.txt"
+        className="hidden"
+      />
+
+      {/* Hidden File Input for Email Attachments */}
+      <input
+        type="file"
+        ref={attachmentInputRef}
+        onChange={handleAttachmentSelect}
+        multiple
         className="hidden"
       />
 
@@ -238,14 +295,21 @@ export const ComposeForm: FC<ComposeFormProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Visual Attachment Icon */}
+          {/* Functional Attachment Button */}
           <button
             type="button"
-            className="p-2 rounded-md hover:bg-gray-200/60 text-gray-500 hover:text-gray-900 transition-colors"
+            onClick={() => attachmentInputRef.current?.click()}
+            className="p-2 rounded-md hover:bg-gray-200/60 text-gray-500 hover:text-gray-900 transition-colors cursor-pointer relative"
             title="Attach file"
           >
             <Paperclip className="w-4 h-4" />
+            {attachedFiles.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                {attachedFiles.length}
+              </span>
+            )}
           </button>
+
 
           {/* Clock / Send Later Icon */}
           <button
@@ -366,6 +430,33 @@ export const ComposeForm: FC<ComposeFormProps> = ({
           </button>
         </div>
       )}
+
+      {/* Attached Files Chips Banner */}
+      {attachedFiles.length > 0 && (
+        <div className="px-6 py-2 bg-purple-50 border-b border-purple-200 flex items-center gap-2 flex-wrap text-xs text-purple-900 font-medium">
+          <Paperclip className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+          <span className="shrink-0 font-bold">Attachments ({attachedFiles.length}):</span>
+          {attachedFiles.map((file) => (
+            <div
+              key={file.name}
+              className="inline-flex items-center gap-1.5 bg-white border border-purple-200 text-purple-800 px-2 py-0.5 rounded shadow-2xs text-xs font-semibold"
+            >
+              <span className="truncate max-w-[150px]">{file.name}</span>
+              <span className="text-[10px] text-purple-500 font-normal">
+                ({(file.size / 1024).toFixed(1)} KB)
+              </span>
+              <button
+                type="button"
+                onClick={() => handleRemoveAttachment(file.name)}
+                className="text-purple-400 hover:text-purple-700 p-0.5 rounded cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
 
       {/* Form Fields */}
       <div className="p-6 space-y-4 flex-1 flex flex-col">

@@ -19,16 +19,13 @@ export const scheduleEmailJob = async (
   }
 
   const now = Date.now();
-  const delay = scheduledTime - now;
-
-  if (delay <= 0) {
-    throw new Error(
-      `Cannot schedule job for email ID ${emailId}: scheduledAt (${new Date(scheduledTime).toISOString()}) is in the past`
-    );
-  }
+  const rawDelay = scheduledTime - now;
+  const delay = Math.max(0, rawDelay);
 
   // Deterministic jobId to prevent duplicate delayed jobs for the same Email record
   const jobId = `email-${emailId}`;
+
+  console.log(`[Scheduler] Job created for email ID ${emailId} with calculated delay ${delay}ms (target: ${new Date(scheduledTime).toISOString()})`);
 
   const job = await emailQueue.add(
     'send-email',
@@ -44,5 +41,8 @@ export const scheduleEmailJob = async (
     }
   );
 
+  console.log(`[Scheduler] Job added to Redis (jobId: ${job.id}, queue: email-scheduler)`);
+
   return job;
 };
+

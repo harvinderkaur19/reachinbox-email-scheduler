@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+export const attachmentSchema = z.object({
+  filename: z.string().min(1, 'filename is required'),
+  contentType: z.string().optional().default('application/octet-stream'),
+  content: z.string().min(1, 'content is required'), // Base64 encoded string
+});
+
 export const scheduleEmailSchema = z.object({
   senderAccountId: z
     .string({ required_error: 'senderAccountId is required' })
@@ -18,8 +24,7 @@ export const scheduleEmailSchema = z.object({
     .transform((emails) => Array.from(new Set(emails))),
   startTime: z
     .string({ required_error: 'startTime is required' })
-    .refine((val) => !isNaN(Date.parse(val)), { message: 'startTime must be a valid datetime string' })
-    .refine((val) => new Date(val).getTime() > Date.now(), { message: 'startTime must be in the future' }),
+    .refine((val) => !isNaN(Date.parse(val)), { message: 'startTime must be a valid datetime string' }),
   delayBetweenEmails: z
     .number({ required_error: 'delayBetweenEmails is required' })
     .int('delayBetweenEmails must be an integer')
@@ -28,6 +33,8 @@ export const scheduleEmailSchema = z.object({
     .number({ required_error: 'hourlyLimit is required' })
     .int('hourlyLimit must be an integer')
     .min(1, 'hourlyLimit must be a positive integer'),
+  attachments: z.array(attachmentSchema).optional(),
 });
 
 export type ScheduleEmailInput = z.infer<typeof scheduleEmailSchema>;
+

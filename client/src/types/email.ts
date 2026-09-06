@@ -15,6 +15,12 @@ export interface UserProfile {
   senderAccounts?: SenderAccountItem[];
 }
 
+export interface ScheduleEmailAttachment {
+  filename: string;
+  contentType?: string;
+  content: string; // base64 string
+}
+
 export interface ScheduleEmailInput {
   senderAccountId: string;
   subject: string;
@@ -23,7 +29,9 @@ export interface ScheduleEmailInput {
   startTime: string;
   delayBetweenEmails: number;
   hourlyLimit: number;
+  attachments?: ScheduleEmailAttachment[];
 }
+
 
 export interface ScheduleCampaignResult {
   campaignId: string;

@@ -23,6 +23,13 @@ const envSchema = z.object({
   // Elasticsearch Connection
   ELASTICSEARCH_NODE: z.string().default('http://localhost:9200'),
 
+  // SMTP Configuration (Ethereal Email)
+  SMTP_HOST: z.string().default('smtp.ethereal.email'),
+  SMTP_PORT: z.string().default('587').transform((val) => parseInt(val, 10)),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  SMTP_SECURE: z.string().default('false').transform((val) => val === 'true'),
+
   // OAuth & Session Placeholders
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

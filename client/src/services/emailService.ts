@@ -12,6 +12,23 @@ export class ApiError extends Error {
 }
 
 /**
+ * Builds API request headers incorporating Authorization Bearer token if stored in localStorage.
+ */
+export const getAuthHeaders = (extraHeaders: Record<string, string> = {}): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...extraHeaders,
+  };
+
+  const token = localStorage.getItem('session_token');
+  if (token && token.trim() !== '') {
+    headers['Authorization'] = `Bearer ${token.trim()}`;
+  }
+
+  return headers;
+};
+
+/**
  * Fetches paginated scheduled emails belonging to the authenticated user.
  */
 export const getScheduledEmails = async (
@@ -21,9 +38,7 @@ export const getScheduledEmails = async (
   const url = `${API_BASE_URL}/api/emails/scheduled?page=${page}&limit=${limit}`;
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     credentials: 'include',
   });
 
@@ -53,9 +68,7 @@ export const getSentEmails = async (
   const url = `${API_BASE_URL}/api/emails/sent?page=${page}&limit=${limit}`;
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     credentials: 'include',
   });
 
@@ -84,9 +97,7 @@ export const scheduleEmails = async (
   const url = `${API_BASE_URL}/api/emails/schedule`;
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     credentials: 'include',
     body: JSON.stringify(inputPayload),
   });
@@ -118,9 +129,7 @@ export const searchEmails = async (
   const url = `${API_BASE_URL}/api/emails/search?q=${encodeURIComponent(query)}`;
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     credentials: 'include',
   });
 
@@ -139,3 +148,4 @@ export const searchEmails = async (
 
   return payload.data;
 };
+

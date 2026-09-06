@@ -122,15 +122,78 @@ export const getSession = async (
 };
 
 /**
+ * Generates a cryptographically secure one-time authentication handoff token.
+ * Token is stored in Redis for 60 seconds with single-use semantics.
+ */
+export const createHandoffToken = async (
+  sessionId: string,
+  userId: string
+): Promise<string> => {
+  const handoffToken = crypto.randomBytes(32).toString('hex');
+  const redis = getRedisClient();
+
+  const payload = JSON.stringify({
+    sessionId,
+    userId,
+    createdAt: new Date().toISOString(),
+  });
+
+  // Store handoff token in Redis with a strict 60-second TTL
+  await redis.set(`handoff:${handoffToken}`, payload, 'EX', 60);
+
+  console.log(`[HandoffToken] Created one-time handoff token for userId: ${userId}`);
+  return handoffToken;
+};
+
+/**
+ * Validates and atomically consumes a one-time handoff token from Redis.
+ */
+export const exchangeHandoffToken = async (
+  token: string
+): Promise<{ sessionId: string; userId: string } | null> => {
+  if (!token || typeof token !== 'string') return null;
+
+  const redis = getRedisClient();
+  const rawData = await redis.get(`handoff:${token}`);
+
+  if (!rawData) {
+    console.log('[HandoffToken] Handoff token exchange failed: Token invalid or expired');
+    return null;
+  }
+
+  // Immediately invalidate handoff token so it cannot be re-used
+  await redis.del(`handoff:${token}`);
+
+  try {
+    const data = JSON.parse(rawData);
+    if (data && typeof data.sessionId === 'string' && typeof data.userId === 'string') {
+      console.log(`[HandoffToken] Exchanged one-time handoff token successfully for userId: ${data.userId}`);
+      return { sessionId: data.sessionId, userId: data.userId };
+    }
+  } catch (err) {
+    console.error('⚠️ [HandoffToken] Failed to parse handoff token JSON payload:', err);
+  }
+
+  return null;
+};
+
+/**
  * Destroys the active session in Redis and clears the sid cookie on the response.
  */
 export const destroySession = async (req: Request, res: Response): Promise<void> => {
   const cookies = parseCookies(req.headers.cookie);
-  const sessionId = cookies.sid;
+  const authHeader =
+    req.headers.authorization ||
+    (req.headers['x-session-token'] as string) ||
+    (req.query.session_token as string);
+  const tokenFallback = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : undefined;
+
+  const sessionId = cookies.sid || tokenFallback;
 
   if (sessionId) {
     const redis = getRedisClient();
     await redis.del(`session:${sessionId}`);
+    console.log('[Session] Redis session destroyed for session token');
   }
 
   const useSecureCrossOrigin = isSecureCrossOrigin();

@@ -19,6 +19,10 @@ export const authenticateUser = async (
 
     const tokenFallback = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : undefined;
 
+    if (tokenFallback) {
+      console.log(`[Session] Bearer token received (length: ${tokenFallback.length})`);
+    }
+
     const session = await getSession(req.headers.cookie, tokenFallback);
     if (!session) {
       res.status(401).json({
@@ -27,6 +31,8 @@ export const authenticateUser = async (
       });
       return;
     }
+
+    console.log(`[Session] Redis session found for userId: ${session.userId}`);
 
     const prisma = getPrismaClient();
     const user = await prisma.user.findUnique({
@@ -41,6 +47,8 @@ export const authenticateUser = async (
       return;
     }
 
+    console.log(`[Session] Authenticated user returned: ${user.email}`);
+
     req.user = user;
     next();
   } catch (error) {
@@ -51,3 +59,4 @@ export const authenticateUser = async (
     });
   }
 };
+

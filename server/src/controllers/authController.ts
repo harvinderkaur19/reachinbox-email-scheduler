@@ -9,7 +9,12 @@ import {
   fetchGoogleUserProfile,
   upsertGoogleUser,
 } from '../services/authService';
-import { createSession, destroySession } from '../utils/session';
+import {
+  createSession,
+  destroySession,
+  createHandoffToken,
+  exchangeHandoffToken,
+} from '../utils/session';
 
 /**
  * GET /api/auth/google
@@ -28,7 +33,8 @@ export const googleAuthStart = async (_req: Request, res: Response): Promise<voi
 
 /**
  * GET /api/auth/google/callback
- * Handles Google OAuth callback, validates state, exchanges tokens, upserts user, and establishes session.
+ * Handles Google OAuth callback, validates state, exchanges tokens, upserts user, establishes session,
+ * and generates a one-time auth handoff token for secure frontend session handoff.
  */
 export const googleAuthCallback = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -59,17 +65,66 @@ export const googleAuthCallback = async (req: Request, res: Response): Promise<v
 
     // Deterministic user upsert in Prisma MySQL
     const user = await upsertGoogleUser(googleProfile);
-    console.log(`[AuthController] Google profile verified and user record upserted successfully.`);
+    console.log(`[AuthController] Google profile verified and user record upserted successfully for user: ${user.email}`);
 
     // Create Redis-backed opaque session & set HTTP-only cookie
-    await createSession(res, user.id);
-    console.log(`[AuthController] Session established in Redis and Set-Cookie header set. Redirecting to: ${config.CLIENT_URL}`);
+    const sessionId = await createSession(res, user.id);
+    console.log(`[AuthController] Session established in Redis and Set-Cookie header set.`);
 
-    // Redirect browser to frontend dashboard
-    res.redirect(config.CLIENT_URL);
+    // Generate a secure one-time handoff token (60s TTL, single use)
+    const handoffToken = await createHandoffToken(sessionId, user.id);
+
+    const redirectUrl = `${config.CLIENT_URL}/auth/callback?token=${handoffToken}`;
+    console.log(`[AuthController] Redirecting browser to frontend callback with handoff token: ${config.CLIENT_URL}/auth/callback?token=...`);
+
+    // Redirect browser to frontend callback page
+    res.redirect(redirectUrl);
   } catch (error) {
     console.error('⚠️ [AuthController] Error in Google OAuth callback:', (error as Error).message);
     res.redirect(`${config.CLIENT_URL}/?error=auth_failed`);
+  }
+};
+
+/**
+ * POST /api/auth/exchange
+ * Exchanges a one-time handoff token for an authenticated session token.
+ */
+export const exchangeHandoffTokenHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.body || {};
+
+    if (!token || typeof token !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'Handoff token is required',
+      });
+      return;
+    }
+
+    const result = await exchangeHandoffToken(token);
+    if (!result) {
+      res.status(401).json({
+        success: false,
+        error: 'Invalid or expired handoff token',
+      });
+      return;
+    }
+
+    console.log(`[AuthController] Handoff token exchanged successfully for userId: ${result.userId}`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        sessionToken: result.sessionId,
+        userId: result.userId,
+      },
+    });
+  } catch (error) {
+    console.error('⚠️ [AuthController] Error exchanging handoff token:', (error as Error).message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to exchange handoff token',
+    });
   }
 };
 
@@ -87,7 +142,7 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  console.log('[AuthController] GET /api/auth/me succeeded for authenticated session.');
+  console.log(`[Session] Authenticated user returned: ${req.user.email}`);
 
   const prisma = getPrismaClient();
   const senderAccounts = await prisma.senderAccount.findMany({
@@ -134,3 +189,4 @@ export const logoutUser = async (req: Request, res: Response): Promise<void> => 
     });
   }
 };
+

@@ -5,7 +5,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ComposePage } from './pages/ComposePage';
 import { EmailDetailPage } from './pages/EmailDetailPage';
 import { API_BASE_URL } from './config';
-import { getScheduledEmails, getSentEmails, searchEmails, scheduleEmails, ApiError } from './services/emailService';
+import { getScheduledEmails, getSentEmails, searchEmails, scheduleEmails, ApiError, getAuthHeaders } from './services/emailService';
 import { Loader2 } from 'lucide-react';
 
 export function App() {
@@ -23,11 +23,76 @@ export function App() {
   const [isFetchingEmails, setIsFetchingEmails] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Verify active application session on startup via GET /api/auth/me
+  // Verify active application session or exchange one-time handoff token on startup
   useEffect(() => {
-    const checkAuthSession = async () => {
+    const initAuth = async () => {
+      setIsLoading(true);
+
+      const searchParams = new URLSearchParams(window.location.search);
+      const handoffToken = searchParams.get('token');
+
+      // Path 1: One-time handoff token exchange flow from Google OAuth redirect
+      if (handoffToken && handoffToken.trim() !== '') {
+        try {
+          console.log('[Auth] Exchanging one-time handoff token with backend...');
+          const exchangeRes = await fetch(`${API_BASE_URL}/api/auth/exchange`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ token: handoffToken.trim() }),
+          });
+
+          if (exchangeRes.ok) {
+            const exchangePayload = await exchangeRes.json();
+            if (exchangePayload.success && exchangePayload.data?.sessionToken) {
+              const sessionToken = exchangePayload.data.sessionToken;
+              localStorage.setItem('session_token', sessionToken);
+              console.log('[Auth] Session token received and saved to localStorage.');
+
+              // Remove query parameter cleanly from address bar
+              window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname.replace(/\/auth\/callback\/?$/, '') || '/'
+              );
+
+              // Immediately fetch user profile with Bearer token header
+              const meRes = await fetch(`${API_BASE_URL}/api/auth/me`, {
+                headers: getAuthHeaders(),
+                credentials: 'include',
+              });
+
+              if (meRes.ok) {
+                const mePayload = await meRes.json();
+                if (mePayload.success && mePayload.data?.user) {
+                  setUser(mePayload.data.user);
+                  setIsLoading(false);
+                  return;
+                }
+              }
+            }
+          }
+
+          console.warn('[Auth] Handoff token exchange failed or returned invalid response.');
+          localStorage.removeItem('session_token');
+          window.history.replaceState({}, document.title, '/?error=token_exchange_failed');
+          setUser(null);
+        } catch (err) {
+          console.error('[Auth] Error during handoff token exchange:', err);
+          localStorage.removeItem('session_token');
+          setUser(null);
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      // Path 2: Standard authentication verification (page load / refresh)
       try {
         const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: getAuthHeaders(),
           credentials: 'include',
         });
 
@@ -36,9 +101,11 @@ export function App() {
           if (payload.success && payload.data?.user) {
             setUser(payload.data.user);
           } else {
+            localStorage.removeItem('session_token');
             setUser(null);
           }
         } else {
+          localStorage.removeItem('session_token');
           setUser(null);
         }
       } catch (error) {
@@ -49,7 +116,7 @@ export function App() {
       }
     };
 
-    checkAuthSession();
+    initAuth();
   }, []);
 
   // Fetch real email list & pagination totals from backend
@@ -79,7 +146,8 @@ export function App() {
       }
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 401) {
-        // Handle 401 by clearing authenticated user state
+        // Handle 401 by clearing authenticated user state and token
+        localStorage.removeItem('session_token');
         setUser(null);
       } else {
         setFetchError(err.message || 'Failed to load emails from backend');
@@ -99,6 +167,7 @@ export function App() {
       setEmails(searchData.emails || []);
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 401) {
+        localStorage.removeItem('session_token');
         setUser(null);
       } else {
         setFetchError(err.message || 'Search service is currently unavailable');
@@ -141,15 +210,18 @@ export function App() {
     try {
       await fetch(`${API_BASE_URL}/api/auth/logout`, {
         method: 'POST',
+        headers: getAuthHeaders(),
         credentials: 'include',
       });
     } catch (error) {
       console.error('Error during logout API request:', error);
     } finally {
+      localStorage.removeItem('session_token');
       setUser(null);
       setView('dashboard');
     }
   };
+
 
   const handleNavigate = (nav: 'scheduled' | 'sent') => {
     setActiveNav(nav);

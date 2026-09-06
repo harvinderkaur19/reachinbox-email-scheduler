@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import { config } from './config';
 import emailRoutes from './routes/emailRoutes';
+import slackRoutes from './routes/slackRoutes';
 
 const app: Express = express();
 
@@ -11,6 +12,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/emails', emailRoutes);
+app.use('/api/slack', slackRoutes);
 
 // Health Check Endpoint
 app.get('/health', (_req: Request, res: Response) => {

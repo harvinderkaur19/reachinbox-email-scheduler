@@ -25,6 +25,16 @@ export const parseCookies = (cookieHeader?: string): Record<string, string> => {
 };
 
 /**
+ * Helper to determine if cross-origin secure cookies (SameSite=None; Secure) are required.
+ * Returns true if NODE_ENV is production OR if CLIENT_URL uses HTTPS / non-localhost origin.
+ */
+const isSecureCrossOrigin = (): boolean => {
+  if (config.NODE_ENV === 'production') return true;
+  if (!config.CLIENT_URL) return false;
+  return config.CLIENT_URL.startsWith('https://') || !config.CLIENT_URL.includes('localhost');
+};
+
+/**
  * Creates an opaque session in Redis and sets an HTTP-only cookie on the response.
  */
 export const createSession = async (res: Response, userId: string): Promise<string> => {
@@ -38,8 +48,8 @@ export const createSession = async (res: Response, userId: string): Promise<stri
 
   await redis.set(`session:${sessionId}`, sessionData, 'EX', SESSION_TTL_SECONDS);
 
-  const isProduction = config.NODE_ENV === 'production';
-  const sameSiteMode = isProduction ? 'SameSite=None' : 'SameSite=Lax';
+  const useSecureCrossOrigin = isSecureCrossOrigin();
+  const sameSiteMode = useSecureCrossOrigin ? 'SameSite=None' : 'SameSite=Lax';
 
   const cookieParts = [
     `sid=${sessionId}`,
@@ -49,7 +59,7 @@ export const createSession = async (res: Response, userId: string): Promise<stri
     `Max-Age=${SESSION_TTL_SECONDS}`,
   ];
 
-  if (isProduction) {
+  if (useSecureCrossOrigin) {
     cookieParts.push('Secure');
   }
 
@@ -93,8 +103,8 @@ export const destroySession = async (req: Request, res: Response): Promise<void>
     await redis.del(`session:${sessionId}`);
   }
 
-  const isProduction = config.NODE_ENV === 'production';
-  const sameSiteMode = isProduction ? 'SameSite=None' : 'SameSite=Lax';
+  const useSecureCrossOrigin = isSecureCrossOrigin();
+  const sameSiteMode = useSecureCrossOrigin ? 'SameSite=None' : 'SameSite=Lax';
 
   const cookieParts = [
     'sid=',
@@ -104,7 +114,7 @@ export const destroySession = async (req: Request, res: Response): Promise<void>
     'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
   ];
 
-  if (isProduction) {
+  if (useSecureCrossOrigin) {
     cookieParts.push('Secure');
   }
 

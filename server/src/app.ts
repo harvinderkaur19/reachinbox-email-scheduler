@@ -7,8 +7,24 @@ import authRoutes from './routes/authRoutes';
 
 const app: Express = express();
 
-// Middleware
-app.use(cors({ origin: config.CLIENT_URL, credentials: true }));
+// CORS Middleware with credentials enabled for cross-origin session cookies
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      const targetUrl = config.CLIENT_URL ? config.CLIENT_URL.replace(/\/+$/, '') : '';
+      const incomingOrigin = origin.replace(/\/+$/, '');
+
+      if (incomingOrigin === targetUrl || incomingOrigin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      callback(null, true);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Routes

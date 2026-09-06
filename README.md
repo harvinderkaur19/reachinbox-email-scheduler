@@ -70,8 +70,18 @@ cd client
 npm install
 npm run dev
 ```
-
 The frontend client application will run at `http://localhost:5173`.
+
+#### Run API server:
+```bash
+npm run dev
+```
+
+### Run BullMQ worker in a separate terminal:
+```bash
+npm run worker
+```
+
 
 ## Placeholder / Future Roadmap Sections
 - [ ] Database Schema & Migrations

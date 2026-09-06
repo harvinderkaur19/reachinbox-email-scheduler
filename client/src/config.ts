@@ -1,13 +1,12 @@
 const getApiBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
-  if (envUrl) {
+  if (envUrl && envUrl.trim() !== '') {
     return envUrl.replace(/\/api\/?$/, '');
   }
 
+  // In production, default to relative path "" so Vercel vercel.json rewrites proxy /api/* to Railway seamlessly
   if (import.meta.env.PROD) {
-    console.warn(
-      '⚠️ VITE_API_URL environment variable is not defined in production. Please configure VITE_API_URL in Vercel project settings to your deployed Railway backend URL.'
-    );
+    return '';
   }
 
   return 'http://localhost:5000';

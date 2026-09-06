@@ -72,14 +72,13 @@ npm run dev
 ```
 The frontend client application will run at `http://localhost:5173`.
 
-<<<<<<< HEAD
 ## Production Deployment Guide
 
 ### Deployment Architecture
-- **Frontend**: React + Vite SPA (Vercel or Render Static Site)
-- **Backend API**: Express + TypeScript Web Service (Render Web Service / Railway)
-- **Background Worker**: BullMQ Queue Consumer (Render Background Worker)
-- **Database & Services**: Managed MySQL (Aven / PlanetScale / Railway), Managed Redis (Render Redis / Upstash), Managed Elasticsearch (Elastic Cloud / Bonsai)
+- **Frontend**: React + Vite SPA (Vercel)
+- **Backend API**: Express + TypeScript Web Service (Railway)
+- **Background Worker**: BullMQ Queue Consumer (Railway)
+- **Database & Services**: MySQL, Redis, Elasticsearch
 
 ---
 
@@ -106,18 +105,16 @@ The frontend client application will run at `http://localhost:5173`.
 |---|---|---|
 | `PORT` | HTTP port provided by host | `5000` |
 | `NODE_ENV` | Environment mode | `production` |
-| `CLIENT_URL` | Frontend origin for CORS & cookies | `https://reachinbox-client.vercel.app` |
+| `CLIENT_URL` | Frontend origin for CORS & cookies | `https://reachinbox-email-scheduler-three-alpha.vercel.app` |
 | `DATABASE_URL` | MySQL connection URI | `mysql://user:pass@host:3306/db` |
-| `REDIS_URL` | Redis connection URI (preferred) | `rediss://default:pass@host:6379` |
-| `REDIS_HOST` | Redis host (fallback if no `REDIS_URL`) | `localhost` |
-| `REDIS_PORT` | Redis port (fallback if no `REDIS_URL`) | `6379` |
+| `REDIS_URL` | Redis connection URI | `rediss://default:pass@host:6379` |
 | `ELASTICSEARCH_NODE` | Elasticsearch node URL | `https://elastic:pass@es-node:9200` |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | `xxx.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | `GOCSPX-xxx` |
-| `GOOGLE_CALLBACK_URL` | Google OAuth Redirect Callback URI | `https://api.domain.com/api/auth/google/callback` |
+| `GOOGLE_CALLBACK_URL` | Google OAuth Redirect Callback URI | `https://reachinbox-email-scheduler-three-alpha.vercel.app/api/auth/google/callback` |
 | `SLACK_CLIENT_ID` | Slack OAuth App Client ID | `12345.6789` |
 | `SLACK_CLIENT_SECRET` | Slack OAuth App Client Secret | `xxx` |
-| `SLACK_REDIRECT_URI` | Slack OAuth Redirect Callback URI | `https://api.domain.com/api/slack/oauth/callback` |
+| `SLACK_REDIRECT_URI` | Slack OAuth Redirect Callback URI | `https://reachinbox-email-scheduler-three-alpha.vercel.app/api/slack/oauth/callback` |
 | `SESSION_SECRET` | Random session signing secret | `super_secret_production_key` |
 | `SMTP_HOST` | SMTP server host | `smtp.ethereal.email` |
 | `SMTP_PORT` | SMTP server port | `587` |
@@ -131,23 +128,4 @@ The frontend client application will run at `http://localhost:5173`.
 #### Frontend Environment Variables
 | Variable | Description | Example |
 |---|---|---|
-| `VITE_API_URL` | Backend production API URL | `https://reachinbox-api.onrender.com` |
-=======
-#### Run API server:
-```bash
-npm run dev
-```
-
-### Run BullMQ worker in a separate terminal:
-```bash
-npm run worker
-```
-
-
-## Placeholder / Future Roadmap Sections
-- [ ] Database Schema & Migrations
-- [ ] Queue System & Background Workers
-- [ ] Email Provider Integration & Rate Limiting
-- [ ] Authentication & User Management
-- [ ] Analytics & Dashboard UI
->>>>>>> aa7d3524c2f01867d3167d760cdb080db6b21b76
+| `VITE_API_URL` | Optional backend API base URL override (leave empty when using Vercel `/api/*` rewrites) | `https://reachinbox-email-scheduler-three-alpha.vercel.app` |

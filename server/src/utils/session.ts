@@ -39,11 +39,13 @@ export const createSession = async (res: Response, userId: string): Promise<stri
   await redis.set(`session:${sessionId}`, sessionData, 'EX', SESSION_TTL_SECONDS);
 
   const isProduction = config.NODE_ENV === 'production';
+  const sameSiteMode = isProduction ? 'SameSite=None' : 'SameSite=Lax';
+
   const cookieParts = [
     `sid=${sessionId}`,
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
+    sameSiteMode,
     `Max-Age=${SESSION_TTL_SECONDS}`,
   ];
 
@@ -92,11 +94,13 @@ export const destroySession = async (req: Request, res: Response): Promise<void>
   }
 
   const isProduction = config.NODE_ENV === 'production';
+  const sameSiteMode = isProduction ? 'SameSite=None' : 'SameSite=Lax';
+
   const cookieParts = [
     'sid=',
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
+    sameSiteMode,
     'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
   ];
 

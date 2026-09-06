@@ -6,7 +6,10 @@ dotenv.config();
 const envSchema = z.object({
   PORT: z.string().default('5000').transform((val) => parseInt(val, 10)),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  CLIENT_URL: z.string().default('http://localhost:5173'),
+  CLIENT_URL: z
+    .string()
+    .default('http://localhost:5173')
+    .transform((url) => url.replace(/\/+$/, '')),
 
   // Development User Isolation
   DEV_USER_ID: z.string().default('dev-user-phase5a'),
@@ -17,6 +20,7 @@ const envSchema = z.object({
     .min(1, { message: 'DATABASE_URL environment variable is required' }),
 
   // Redis Connection
+  REDIS_URL: z.string().optional(),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.string().default('6379').transform((val) => parseInt(val, 10)),
 

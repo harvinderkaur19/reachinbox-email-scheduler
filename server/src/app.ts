@@ -3,14 +3,16 @@ import cors from 'cors';
 import { config } from './config';
 import emailRoutes from './routes/emailRoutes';
 import slackRoutes from './routes/slackRoutes';
+import authRoutes from './routes/authRoutes';
 
 const app: Express = express();
 
 // Middleware
-app.use(cors({ origin: config.CLIENT_URL }));
+app.use(cors({ origin: config.CLIENT_URL, credentials: true }));
 app.use(express.json());
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/slack', slackRoutes);
 

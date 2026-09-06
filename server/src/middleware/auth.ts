@@ -1,45 +1,46 @@
 import { Request, Response, NextFunction } from 'express';
 import { getPrismaClient } from '../utils/prisma';
-import { config } from '../config';
-import { User } from '@prisma/client';
-
-let cachedDevUser: User | null = null;
+import { getSession } from '../utils/session';
 
 /**
- * TEMPORARY Development Authentication Middleware.
- * Uses an idempotent Prisma upsert for config.DEV_USER_ID.
- * Isolated to easily replace with real Google OAuth authentication in future phases.
+ * Authentication middleware for protected application routes.
+ * Validates the HTTP-only sid session cookie in Redis and populates req.user.
  */
-export const resolveDevUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const authenticateUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
-    if (!cachedDevUser) {
-      const prisma = getPrismaClient();
-      cachedDevUser = await prisma.user.upsert({
-        where: { id: config.DEV_USER_ID },
-        update: {},
-        create: {
-          id: config.DEV_USER_ID,
-          googleId: `google-dev-${config.DEV_USER_ID}`,
-          email: `${config.DEV_USER_ID}@reachinbox.ai`,
-          name: 'Development User',
-        },
+    const session = await getSession(req.headers.cookie);
+    if (!session) {
+      res.status(401).json({
+        success: false,
+        error: 'Unauthenticated: Invalid or expired session',
       });
+      return;
     }
 
-    req.user = cachedDevUser;
+    const prisma = getPrismaClient();
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+    });
+
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        error: 'Unauthenticated: User profile not found',
+      });
+      return;
+    }
+
+    req.user = user;
     next();
   } catch (error) {
-    console.error('[DevAuthMiddleware] Error resolving development user:', error);
+    console.error('⚠️ [AuthMiddleware] Error during session authentication:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to resolve development authentication user context',
+      error: 'Internal authentication error',
     });
   }
-};
-
-/**
- * Helper to clear cached dev user if needed during testing.
- */
-export const clearDevUserCache = (): void => {
-  cachedDevUser = null;
 };

@@ -1,7 +1,7 @@
 import { FC } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ComposeForm } from '../components/email/ComposeForm';
-import { UserProfile } from '../types/email';
+import { UserProfile, ScheduleEmailInput } from '../types/email';
 
 interface ComposePageProps {
   user: UserProfile;
@@ -13,7 +13,7 @@ interface ComposePageProps {
   onNavigate: (nav: 'scheduled' | 'sent') => void;
   onOpenCompose: () => void;
   onBack: () => void;
-  onSubmitSend: (data: any) => void;
+  onSubmitSchedule: (payload: ScheduleEmailInput) => Promise<void>;
   onLogout: () => void;
 }
 
@@ -27,7 +27,7 @@ export const ComposePage: FC<ComposePageProps> = ({
   onNavigate,
   onOpenCompose,
   onBack,
-  onSubmitSend,
+  onSubmitSchedule,
   onLogout,
 }) => {
   return (
@@ -43,9 +43,9 @@ export const ComposePage: FC<ComposePageProps> = ({
       onLogout={onLogout}
     >
       <ComposeForm
-        fromEmail={user.email}
+        user={user}
         onBack={onBack}
-        onSubmitSend={onSubmitSend}
+        onSubmitSchedule={onSubmitSchedule}
       />
     </AppLayout>
   );

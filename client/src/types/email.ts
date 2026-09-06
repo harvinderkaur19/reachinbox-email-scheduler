@@ -1,10 +1,36 @@
 export type EmailStatusType = 'SCHEDULED' | 'SENT' | 'FAILED' | 'PROCESSING';
 
+export interface SenderAccountItem {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
   avatarUrl?: string;
+  senderAccounts?: SenderAccountItem[];
+}
+
+export interface ScheduleEmailInput {
+  senderAccountId: string;
+  subject: string;
+  body: string;
+  recipients: string[];
+  startTime: string;
+  delayBetweenEmails: number;
+  hourlyLimit: number;
+}
+
+export interface ScheduleCampaignResult {
+  campaignId: string;
+  scheduledCount: number;
+  queuedCount: number;
+  queueFailures?: Array<{ emailId: string; recipient: string; error: string }>;
+  isPartial?: boolean;
 }
 
 export interface EmailItem {
@@ -12,13 +38,32 @@ export interface EmailItem {
   campaignId: string;
   recipientEmail: string;
   subject: string;
-  body: string;
+  body?: string;
   status: EmailStatusType;
-  scheduledAt: string;
+  scheduledAt?: string;
   sentAt?: string | null;
   failureReason?: string | null;
   createdAt: string;
   isStarred?: boolean;
+}
+
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface EmailListPayload<T = EmailItem> {
+  emails: T[];
+  pagination: PaginationInfo;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
 }
 
 export interface RecipientChip {

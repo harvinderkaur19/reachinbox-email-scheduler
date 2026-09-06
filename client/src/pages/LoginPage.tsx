@@ -2,18 +2,23 @@ import { FC, useState, FormEvent } from 'react';
 import { Mail, Lock, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { API_BASE_URL } from '../config';
 
 interface LoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess?: () => void;
 }
 
-export const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
+export const LoginPage: FC<LoginPageProps> = () => {
   const [email, setEmail] = useState('harvinder@reachinbox.ai');
   const [password, setPassword] = useState('password123');
 
+  const handleGoogleLogin = () => {
+    window.location.href = `${API_BASE_URL}/api/auth/google`;
+  };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    onLoginSuccess();
+    handleGoogleLogin();
   };
 
   return (
@@ -41,8 +46,8 @@ export const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
         {/* Google Sign In Button */}
         <button
           type="button"
-          onClick={onLoginSuccess}
-          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-4 rounded-md text-sm transition-colors shadow-2xs mb-6"
+          onClick={handleGoogleLogin}
+          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-4 rounded-md text-sm transition-colors shadow-2xs mb-6 cursor-pointer"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path

@@ -1,4 +1,4 @@
-import { FC, useState, KeyboardEvent } from 'react';
+import { FC, useState, KeyboardEvent, ChangeEvent, useRef } from 'react';
 import {
   ArrowLeft,
   Paperclip,
@@ -6,47 +6,87 @@ import {
   Send,
   Upload,
   ChevronDown,
+  Loader2,
+  AlertCircle,
+  FileText,
+  X,
 } from 'lucide-react';
 import { RecipientChip } from './RecipientChip';
 import { EditorToolbar } from './EditorToolbar';
 import { SchedulePopover } from './SchedulePopover';
 import { Button } from '../ui/Button';
+import { UserProfile, ScheduleEmailInput } from '../../types/email';
 
 interface ComposeFormProps {
-  fromEmail: string;
+  user: UserProfile;
   onBack: () => void;
-  onSubmitSend: (data: any) => void;
+  onSubmitSchedule: (payload: ScheduleEmailInput) => Promise<void>;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const ComposeForm: FC<ComposeFormProps> = ({
-  fromEmail,
+  user,
   onBack,
-  onSubmitSend,
+  onSubmitSchedule,
 }) => {
+  // 1. Sender Account Resolution
+  const activeSender =
+    user.senderAccounts && user.senderAccounts.length > 0
+      ? user.senderAccounts[0]
+      : null;
+
+  // 2. Form State
   const [recipients, setRecipients] = useState<string[]>([
     'alpha@example.com',
     'beta@example.com',
   ]);
   const [recipientInput, setRecipientInput] = useState<string>('');
-  const [subject, setSubject] = useState<string>('Q4 Product Update');
+  const [subject, setSubject] = useState<string>('Q4 Product Release Update');
   const [delayBetweenEmails, setDelayBetweenEmails] = useState<number>(10);
   const [hourlyLimit, setHourlyLimit] = useState<number>(100);
   const [body, setBody] = useState<string>(
-    'Hi team,\n\nHere is the latest product update for Q4. Please review the attached document and let us know if you have any questions.\n\nBest regards,\nReachInbox Team'
+    'Hi team,\n\nHere is the latest product update for Q4. Please review the attached schedule and let us know if you have any questions.\n\nBest regards,\nReachInbox Team'
   );
-  const [scheduledAt, setScheduledAt] = useState<string | null>(null);
 
+  // Default start time: Tomorrow 09:00 AM
+  const defaultStartTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  defaultStartTime.setHours(9, 0, 0, 0);
+  const [scheduledAt, setScheduledAt] = useState<string>(defaultStartTime.toISOString());
+
+  // UI state
   const [showSendLater, setShowSendLater] = useState<boolean>(false);
   const [showSendDropdown, setShowSendDropdown] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [uploadedFileInfo, setUploadedFileInfo] = useState<{
+    fileName: string;
+    count: number;
+  } | null>(null);
 
-  const handleAddRecipient = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // 3. Recipient Add Handler (Enter, comma, semicolon)
+  const addSingleRecipient = (rawInput: string) => {
+    const cleaned = rawInput.trim().toLowerCase().replace(/[,;]/g, '');
+    if (!cleaned) return;
+
+    if (!EMAIL_REGEX.test(cleaned)) {
+      setFormError(`"${cleaned}" is not a valid email address.`);
+      return;
+    }
+
+    setFormError(null);
+    if (!recipients.includes(cleaned)) {
+      setRecipients((prev) => [...prev, cleaned]);
+    }
+  };
+
+  const handleKeyDownRecipient = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
       e.preventDefault();
-      const trimmed = recipientInput.trim().replace(/,/g, '');
-      if (trimmed && !recipients.includes(trimmed)) {
-        setRecipients([...recipients, trimmed]);
-        setRecipientInput('');
-      }
+      addSingleRecipient(recipientInput);
+      setRecipientInput('');
     }
   };
 
@@ -54,26 +94,139 @@ export const ComposeForm: FC<ComposeFormProps> = ({
     setRecipients(recipients.filter((r) => r !== emailToRemove));
   };
 
-  const handleSendNow = () => {
-    onSubmitSend({
-      fromEmail,
-      recipients,
-      subject,
-      delayBetweenEmails,
-      hourlyLimit,
-      body,
-      scheduledAt: scheduledAt || new Date().toISOString(),
-    });
+  // 4. File Upload Handler (.csv & .txt parsing)
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileName = file.name;
+    const reader = new FileReader();
+
+    reader.onload = (evt) => {
+      const textContent = evt.target?.result as string;
+      if (!textContent) return;
+
+      // Extract emails via Regex pattern
+      const emailMatches =
+        textContent.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+
+      const normalizedExtracted = Array.from(
+        new Set(emailMatches.map((em) => em.trim().toLowerCase()))
+      );
+
+      if (normalizedExtracted.length === 0) {
+        setFormError(`No valid email addresses detected in ${fileName}`);
+        return;
+      }
+
+      setFormError(null);
+
+      // Merge and deduplicate with existing recipients
+      const updatedList = Array.from(new Set([...recipients, ...normalizedExtracted]));
+
+      setRecipients(updatedList);
+      setUploadedFileInfo({ fileName, count: normalizedExtracted.length });
+    };
+
+    reader.readAsText(file);
+    // Reset file input value to allow re-uploading the same file if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // 5. Submit Schedule Handler
+  const handleScheduleSubmit = async () => {
+    if (isSubmitting) return; // Prevent double submission
+
+    setFormError(null);
+
+    // Form Validation
+    const senderId = activeSender?.id;
+    if (!senderId) {
+      setFormError('No valid sender account found for user. Please check your account.');
+      return;
+    }
+
+    // Flush any pending recipient text in the input box
+    let finalRecipients = [...recipients];
+    if (recipientInput.trim()) {
+      const pendingClean = recipientInput.trim().toLowerCase().replace(/[,;]/g, '');
+      if (EMAIL_REGEX.test(pendingClean) && !finalRecipients.includes(pendingClean)) {
+        finalRecipients.push(pendingClean);
+        setRecipientInput('');
+      }
+    }
+
+    if (finalRecipients.length === 0) {
+      setFormError('At least one recipient email address is required.');
+      return;
+    }
+
+    if (!subject.trim()) {
+      setFormError('Subject line cannot be empty.');
+      return;
+    }
+
+    if (!body.trim()) {
+      setFormError('Email body content cannot be empty.');
+      return;
+    }
+
+    const startTimeMs = new Date(scheduledAt).getTime();
+    if (isNaN(startTimeMs) || startTimeMs <= Date.now()) {
+      setFormError('Start time must be a valid future date and time.');
+      return;
+    }
+
+    if (isNaN(delayBetweenEmails) || delayBetweenEmails < 0) {
+      setFormError('Delay between emails must be an integer greater than or equal to 0.');
+      return;
+    }
+
+    if (isNaN(hourlyLimit) || hourlyLimit < 1) {
+      setFormError('Hourly limit must be a positive integer >= 1.');
+      return;
+    }
+
+    const payload: ScheduleEmailInput = {
+      senderAccountId: senderId,
+      subject: subject.trim(),
+      body: body.trim(),
+      recipients: finalRecipients,
+      startTime: new Date(scheduledAt).toISOString(),
+      delayBetweenEmails: Math.floor(delayBetweenEmails),
+      hourlyLimit: Math.floor(hourlyLimit),
+    };
+
+    try {
+      setIsSubmitting(true);
+      await onSubmitSchedule(payload);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to schedule campaign');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+      {/* Hidden File Input for CSV/TXT Upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".csv,.txt"
+        className="hidden"
+      />
+
       {/* Top Header Controls Bar */}
       <div className="px-6 py-3.5 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="p-1.5 rounded-md hover:bg-gray-200/60 text-gray-600 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+            disabled={isSubmitting}
+            className="p-1.5 rounded-md hover:bg-gray-200/60 text-gray-600 transition-colors flex items-center gap-1.5 text-xs font-semibold disabled:opacity-50"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
@@ -104,36 +257,42 @@ export const ComposeForm: FC<ComposeFormProps> = ({
             <Clock className="w-4 h-4" />
           </button>
 
-          {/* Green Send / Send Later CTA Dropdown Button */}
+          {/* Green Send / Schedule CTA Dropdown Button */}
           <div className="relative inline-flex rounded-md shadow-sm">
             <Button
               variant="primary"
               size="sm"
-              onClick={handleSendNow}
+              onClick={handleScheduleSubmit}
+              disabled={isSubmitting}
               className="rounded-r-none pr-3"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>{scheduledAt ? 'Schedule Send' : 'Send'}</span>
+              {isSubmitting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              <span>{isSubmitting ? 'Scheduling...' : 'Schedule Campaign'}</span>
             </Button>
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={() => setShowSendDropdown(!showSendDropdown)}
-              className="bg-green-700 hover:bg-green-800 text-white px-2 rounded-r-md border-l border-green-800 flex items-center justify-center focus:outline-none"
+              className="bg-green-700 hover:bg-green-800 text-white px-2 rounded-r-md border-l border-green-800 flex items-center justify-center focus:outline-none disabled:opacity-50"
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
 
             {showSendDropdown && (
-              <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-md shadow-lg py-1 w-44 z-30">
+              <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-md shadow-lg py-1 w-48 z-30">
                 <button
                   onClick={() => {
                     setShowSendDropdown(false);
-                    handleSendNow();
+                    handleScheduleSubmit();
                   }}
                   className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
                   <Send className="w-3.5 h-3.5 text-green-600" />
-                  Send Now
+                  Schedule Now
                 </button>
                 <button
                   onClick={() => {
@@ -151,15 +310,48 @@ export const ComposeForm: FC<ComposeFormProps> = ({
         </div>
       </div>
 
-      {/* Scheduled Info Banner if active */}
+      {/* Form Error Banner */}
+      {formError && (
+        <div className="px-6 py-2.5 bg-red-50 border-b border-red-200 flex items-center gap-2 text-xs text-red-700 font-semibold">
+          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+          <span className="flex-1">{formError}</span>
+          <button
+            onClick={() => setFormError(null)}
+            className="text-red-500 hover:text-red-700 p-0.5"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Scheduled Info Banner */}
       {scheduledAt && (
         <div className="px-6 py-2 bg-green-50 border-b border-green-200 flex items-center justify-between text-xs text-green-900 font-medium">
-          <span>Scheduled to send at: {new Date(scheduledAt).toLocaleString()}</span>
+          <span>Scheduled Start Time: {new Date(scheduledAt).toLocaleString()}</span>
           <button
-            onClick={() => setScheduledAt(null)}
+            onClick={() => setShowSendLater(true)}
             className="text-green-700 underline hover:text-green-900 text-[11px]"
           >
-            Clear schedule
+            Change schedule
+          </button>
+        </div>
+      )}
+
+      {/* Uploaded File Banner */}
+      {uploadedFileInfo && (
+        <div className="px-6 py-2 bg-blue-50 border-b border-blue-200 flex items-center justify-between text-xs text-blue-900 font-medium">
+          <div className="flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
+            <span>
+              Loaded <strong>{uploadedFileInfo.count}</strong> email addresses from{' '}
+              <strong>{uploadedFileInfo.fileName}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => setUploadedFileInfo(null)}
+            className="text-blue-700 underline hover:text-blue-900 text-[11px]"
+          >
+            Dismiss
           </button>
         </div>
       )}
@@ -171,10 +363,12 @@ export const ComposeForm: FC<ComposeFormProps> = ({
           <span className="w-24 text-xs font-bold text-gray-500 uppercase tracking-wider">
             From:
           </span>
-          <span className="text-sm font-semibold text-gray-800">{fromEmail}</span>
+          <span className="text-sm font-semibold text-gray-800">
+            {activeSender ? `${activeSender.name} <${activeSender.email}>` : user.email}
+          </span>
         </div>
 
-        {/* To Field with Recipient Chips & Upload List Visual Control */}
+        {/* To Field with Recipient Chips & Upload List Button */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-3">
           <div className="flex items-center gap-2 flex-1 flex-wrap">
             <span className="w-24 text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">
@@ -192,18 +386,25 @@ export const ComposeForm: FC<ComposeFormProps> = ({
                 type="email"
                 value={recipientInput}
                 onChange={(e) => setRecipientInput(e.target.value)}
-                onKeyDown={handleAddRecipient}
-                placeholder={recipients.length === 0 ? 'Type email & press Enter...' : 'Add email...'}
-                className="text-sm text-gray-800 placeholder-gray-400 focus:outline-none min-w-[160px] flex-1 py-1"
+                onKeyDown={handleKeyDownRecipient}
+                onBlur={() => {
+                  if (recipientInput.trim()) {
+                    addSingleRecipient(recipientInput);
+                    setRecipientInput('');
+                  }
+                }}
+                placeholder={recipients.length === 0 ? 'Type email & press Enter or comma...' : 'Add email...'}
+                className="text-sm text-gray-800 placeholder-gray-400 focus:outline-none min-w-[180px] flex-1 py-1"
               />
             </div>
           </div>
 
-          {/* Visual CSV/Text List Upload Control per Correction 5 */}
+          {/* Functional CSV/TXT Upload Control */}
           <button
             type="button"
-            className="text-xs font-semibold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors shrink-0"
-            title="Upload CSV or TXT recipient list (Visual control)"
+            onClick={() => fileInputRef.current?.click()}
+            className="text-xs font-semibold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            title="Upload CSV or TXT recipient list"
           >
             <Upload className="w-3.5 h-3.5 text-green-600" />
             <span>Upload List</span>

@@ -15,9 +15,19 @@ export const EmailRow: FC<EmailRowProps> = ({
   onToggleStar,
 }) => {
   const isScheduled = email.status === 'SCHEDULED';
-  const displayTime = isScheduled
-    ? email.scheduledAt
-    : email.sentAt || email.createdAt;
+  const rawTime = isScheduled ? email.scheduledAt : email.sentAt || email.createdAt;
+  let formattedTime = rawTime || '';
+  if (rawTime) {
+    const d = new Date(rawTime);
+    if (!isNaN(d.getTime())) {
+      formattedTime = d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+  }
 
   return (
     <div
@@ -42,17 +52,21 @@ export const EmailRow: FC<EmailRowProps> = ({
           <span className="text-sm font-semibold text-gray-900 truncate shrink-0 max-w-xs">
             {email.subject}
           </span>
-          <span className="text-xs text-gray-400 font-medium">--</span>
-          <span className="text-xs text-gray-500 truncate min-w-0">
-            {email.body}
-          </span>
+          {email.body && (
+            <>
+              <span className="text-xs text-gray-400 font-medium">--</span>
+              <span className="text-xs text-gray-500 truncate min-w-0">
+                {email.body}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
       {/* Date & Action Icons */}
       <div className="flex items-center gap-3 shrink-0 ml-4">
         <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
-          {displayTime}
+          {formattedTime}
         </span>
         <button
           type="button"

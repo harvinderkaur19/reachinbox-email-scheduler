@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { resolveDevUser } from '../middleware/auth';
+import { authenticateUser } from '../middleware/auth';
 import { validateRequestBody } from '../middleware/validate';
 import { scheduleEmailSchema } from '../utils/validation/emailValidation';
 import {
@@ -14,7 +14,7 @@ const router = Router();
 // POST /api/emails/schedule
 router.post(
   '/schedule',
-  resolveDevUser,
+  authenticateUser,
   validateRequestBody(scheduleEmailSchema),
   scheduleEmail
 );
@@ -22,21 +22,21 @@ router.post(
 // GET /api/emails/search?q=<query>
 router.get(
   '/search',
-  resolveDevUser,
+  authenticateUser,
   searchEmails
 );
 
 // GET /api/emails/scheduled?page=1&limit=20
 router.get(
   '/scheduled',
-  resolveDevUser,
+  authenticateUser,
   getScheduledEmails
 );
 
 // GET /api/emails/sent?page=1&limit=20
 router.get(
   '/sent',
-  resolveDevUser,
+  authenticateUser,
   getSentEmails
 );
 

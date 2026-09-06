@@ -12,6 +12,7 @@ interface AppLayoutProps {
   onSearchChange: (q: string) => void;
   onNavigate: (nav: 'scheduled' | 'sent') => void;
   onOpenCompose: () => void;
+  onRefresh?: () => void;
   onLogout: () => void;
   children: ReactNode;
 }
@@ -25,6 +26,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
   onSearchChange,
   onNavigate,
   onOpenCompose,
+  onRefresh,
   onLogout,
   children,
 }) => {
@@ -47,6 +49,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
           title={activeNav === 'scheduled' ? 'Scheduled Emails' : 'Sent Emails'}
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
+          onRefresh={onRefresh}
         />
         <main className="flex-1 overflow-y-auto bg-white p-6">
           {children}

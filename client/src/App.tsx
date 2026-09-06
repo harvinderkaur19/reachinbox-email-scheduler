@@ -1,109 +1,154 @@
-import { useState } from 'react';
-import { UserProfile, EmailItem } from './types/email';
+import { useState, useEffect, useCallback } from 'react';
+import { UserProfile, EmailItem, ScheduleEmailInput } from './types/email';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ComposePage } from './pages/ComposePage';
 import { EmailDetailPage } from './pages/EmailDetailPage';
-
-// Static User Profile
-const MOCK_USER: UserProfile = {
-  id: 'dev-user-phase5a',
-  name: 'Harvinder Kaur',
-  email: 'harvinder@reachinbox.ai',
-  avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-};
-
-// Static Realistic Email Mock Data for Visual Rendering
-const INITIAL_MOCK_EMAILS: EmailItem[] = [
-  {
-    id: 'email-101',
-    campaignId: 'campaign-1',
-    recipientEmail: 'alpha.finance@acme.com',
-    subject: 'Q4 Product Release & Revenue Forecast',
-    body: 'Hi team, here is the upcoming schedule and financial projections for the Q4 product release.',
-    status: 'SCHEDULED',
-    scheduledAt: 'Sep 7, 2026 10:00 AM',
-    createdAt: '2026-09-06T12:00:00.000Z',
-    isStarred: true,
-  },
-  {
-    id: 'email-102',
-    campaignId: 'campaign-1',
-    recipientEmail: 'beta.marketing@acme.com',
-    subject: 'Social Media Campaign Brief & Asset Guide',
-    body: 'Attached is the design kit and copy brief for the upcoming social media launch.',
-    status: 'SCHEDULED',
-    scheduledAt: 'Sep 7, 2026 10:15 AM',
-    createdAt: '2026-09-06T12:00:00.000Z',
-    isStarred: false,
-  },
-  {
-    id: 'email-103',
-    campaignId: 'campaign-2',
-    recipientEmail: 'charlie.engineering@acme.com',
-    subject: 'API Integration Specifications & Rate Limit Guidelines',
-    body: 'Please review the Redis atomic reservation script and BullMQ delayed job configuration.',
-    status: 'SCHEDULED',
-    scheduledAt: 'Sep 7, 2026 11:30 AM',
-    createdAt: '2026-09-06T13:00:00.000Z',
-    isStarred: false,
-  },
-  {
-    id: 'email-201',
-    campaignId: 'campaign-0',
-    recipientEmail: 'executive.board@acme.com',
-    subject: 'Monthly Email Deliverability & Performance Analytics',
-    body: 'All system checks passed cleanly. Nodemailer Ethereal SMTP delivery metrics are green.',
-    status: 'SENT',
-    scheduledAt: 'Sep 6, 2026 09:00 AM',
-    sentAt: 'Sep 6, 2026 09:00 AM',
-    createdAt: '2026-09-06T09:00:00.000Z',
-    isStarred: true,
-  },
-  {
-    id: 'email-202',
-    campaignId: 'campaign-0',
-    recipientEmail: 'support.lead@acme.com',
-    subject: 'Customer Onboarding Sequence — Welcome Email',
-    body: 'Welcome to ReachInbox! Your automated email scheduler workspace is ready.',
-    status: 'SENT',
-    scheduledAt: 'Sep 6, 2026 09:30 AM',
-    sentAt: 'Sep 6, 2026 09:30 AM',
-    createdAt: '2026-09-06T09:30:00.000Z',
-    isStarred: false,
-  },
-  {
-    id: 'email-203',
-    campaignId: 'campaign-0',
-    recipientEmail: 'invalid.test.user@nonexistent-domain.com',
-    subject: 'System Test Email Dispatch',
-    body: 'Attempting delivery to test recipient endpoint.',
-    status: 'FAILED',
-    scheduledAt: 'Sep 6, 2026 10:00 AM',
-    sentAt: null,
-    failureReason: '550 5.1.1 User unknown',
-    createdAt: '2026-09-06T10:00:00.000Z',
-    isStarred: false,
-  },
-];
+import { API_BASE_URL } from './config';
+import { getScheduledEmails, getSentEmails, searchEmails, scheduleEmails, ApiError } from './services/emailService';
+import { Loader2 } from 'lucide-react';
 
 export function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeNav, setActiveNav] = useState<'scheduled' | 'sent'>('scheduled');
   const [view, setView] = useState<'dashboard' | 'compose' | 'detail'>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
-  const [emails, setEmails] = useState<EmailItem[]>(INITIAL_MOCK_EMAILS);
+  
+  // Real Backend Email Data & Pagination State
+  const [emails, setEmails] = useState<EmailItem[]>([]);
+  const [scheduledCount, setScheduledCount] = useState<number>(0);
+  const [sentCount, setSentCount] = useState<number>(0);
+  const [isFetchingEmails, setIsFetchingEmails] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Navigation handlers
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-    setView('dashboard');
-    setActiveNav('scheduled');
+  // Verify active application session on startup via GET /api/auth/me
+  useEffect(() => {
+    const checkAuthSession = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const payload = await response.json();
+          if (payload.success && payload.data?.user) {
+            setUser(payload.data.user);
+          } else {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Failed to verify authentication session:', error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuthSession();
+  }, []);
+
+  // Fetch real email list & pagination totals from backend
+  const loadDashboardData = useCallback(async (targetNav: 'scheduled' | 'sent') => {
+    setIsFetchingEmails(true);
+    setFetchError(null);
+
+    try {
+      if (targetNav === 'scheduled') {
+        const scheduledData = await getScheduledEmails(1, 20);
+        setEmails(scheduledData.emails);
+        setScheduledCount(scheduledData.pagination.total);
+
+        // Fetch sent count in background to keep sidebar counts accurate
+        getSentEmails(1, 1)
+          .then((d) => setSentCount(d.pagination.total))
+          .catch(() => {});
+      } else {
+        const sentData = await getSentEmails(1, 20);
+        setEmails(sentData.emails);
+        setSentCount(sentData.pagination.total);
+
+        // Fetch scheduled count in background to keep sidebar counts accurate
+        getScheduledEmails(1, 1)
+          .then((d) => setScheduledCount(d.pagination.total))
+          .catch(() => {});
+      }
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 401) {
+        // Handle 401 by clearing authenticated user state
+        setUser(null);
+      } else {
+        setFetchError(err.message || 'Failed to load emails from backend');
+      }
+    } finally {
+      setIsFetchingEmails(false);
+    }
+  }, []);
+
+  // Execute Elasticsearch search with query
+  const executeSearch = useCallback(async (query: string) => {
+    setIsFetchingEmails(true);
+    setFetchError(null);
+
+    try {
+      const searchData = await searchEmails(query);
+      setEmails(searchData.emails || []);
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 401) {
+        setUser(null);
+      } else {
+        setFetchError(err.message || 'Search service is currently unavailable');
+      }
+    } finally {
+      setIsFetchingEmails(false);
+    }
+  }, []);
+
+  // Debounced search effect (250–300 ms using setTimeout / clearTimeout)
+  useEffect(() => {
+    if (!user || view !== 'dashboard') return;
+
+    const q = searchQuery.trim();
+    if (!q) {
+      // Empty query: load normal active Scheduled / Sent list
+      loadDashboardData(activeNav);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      executeSearch(q);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, user, activeNav, view, loadDashboardData, executeSearch]);
+
+  const handleRefresh = () => {
+    if (user) {
+      const q = searchQuery.trim();
+      if (q) {
+        executeSearch(q);
+      } else {
+        loadDashboardData(activeNav);
+      }
+    }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Error during logout API request:', error);
+    } finally {
+      setUser(null);
+      setView('dashboard');
+    }
   };
 
   const handleNavigate = (nav: 'scheduled' | 'sent') => {
@@ -132,38 +177,42 @@ export function App() {
     );
   };
 
-  const handleSubmitSend = (data: any) => {
-    const newEmail: EmailItem = {
-      id: `email-${Date.now()}`,
-      campaignId: `campaign-${Date.now()}`,
-      recipientEmail: data.recipients.join(', ') || 'recipient@example.com',
-      subject: data.subject || 'Untitled Email',
-      body: data.body || '',
-      status: 'SCHEDULED',
-      scheduledAt: data.scheduledAt ? new Date(data.scheduledAt).toLocaleString() : 'Just now',
-      createdAt: new Date().toISOString(),
-      isStarred: false,
-    };
-
-    setEmails([newEmail, ...emails]);
-    setActiveNav('scheduled');
-    setView('dashboard');
+  const handleSubmitSchedule = async (payload: ScheduleEmailInput) => {
+    try {
+      await scheduleEmails(payload);
+      setActiveNav('scheduled');
+      setView('dashboard');
+      loadDashboardData('scheduled');
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 401) {
+        setUser(null);
+      }
+      throw err;
+    }
   };
 
-  // 1. Render Login Screen if not authenticated
-  if (!isAuthenticated) {
-    return <LoginPage onLoginSuccess={handleLogin} />;
+  // 1. Loading state view
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4 text-gray-600 font-sans select-none">
+        <Loader2 className="w-8 h-8 text-green-600 animate-spin mb-3" />
+        <p className="text-sm font-semibold tracking-tight text-gray-700">
+          Loading ReachInbox workspace...
+        </p>
+      </div>
+    );
   }
 
-  // Calculate counts for sidebar badges
-  const scheduledCount = emails.filter((e) => e.status === 'SCHEDULED').length;
-  const sentCount = emails.filter((e) => e.status === 'SENT' || e.status === 'FAILED').length;
+  // 2. Render Login Screen if not authenticated
+  if (!user) {
+    return <LoginPage />;
+  }
 
-  // 2. Render Compose View
+  // 3. Render Compose View
   if (view === 'compose') {
     return (
       <ComposePage
-        user={MOCK_USER}
+        user={user}
         activeNav={activeNav}
         scheduledCount={scheduledCount}
         sentCount={sentCount}
@@ -172,17 +221,17 @@ export function App() {
         onNavigate={handleNavigate}
         onOpenCompose={handleOpenCompose}
         onBack={handleBackToDashboard}
-        onSubmitSend={handleSubmitSend}
+        onSubmitSchedule={handleSubmitSchedule}
         onLogout={handleLogout}
       />
     );
   }
 
-  // 3. Render Email Detail View
+  // 4. Render Email Detail View
   if (view === 'detail' && selectedEmail) {
     return (
       <EmailDetailPage
-        user={MOCK_USER}
+        user={user}
         activeNav={activeNav}
         email={selectedEmail}
         scheduledCount={scheduledCount}
@@ -197,20 +246,23 @@ export function App() {
     );
   }
 
-  // 4. Default: Render Dashboard View (Scheduled or Sent)
+  // 5. Default: Render Dashboard View (Scheduled or Sent)
   return (
     <DashboardPage
-      user={MOCK_USER}
+      user={user}
       activeNav={activeNav}
       emails={emails}
       scheduledCount={scheduledCount}
       sentCount={sentCount}
       searchQuery={searchQuery}
+      isFetching={isFetchingEmails}
+      fetchError={fetchError}
       onSearchChange={setSearchQuery}
       onNavigate={handleNavigate}
       onOpenCompose={handleOpenCompose}
       onSelectEmail={handleSelectEmail}
       onToggleStar={handleToggleStar}
+      onRefresh={handleRefresh}
       onLogout={handleLogout}
     />
   );

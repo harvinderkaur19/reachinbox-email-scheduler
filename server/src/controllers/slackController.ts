@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { config } from '../config';
+import { getSession } from '../utils/session';
+import { getPrismaClient } from '../utils/prisma';
 import {
   generateSlackOAuthState,
   validateAndDeleteOAuthState,
@@ -15,6 +17,15 @@ import {
  */
 export const startOAuth = async (req: Request, res: Response): Promise<void> => {
   try {
+    if (!req.user || !req.user.id) {
+      const session = await getSession(req.headers.cookie);
+      if (session?.userId) {
+        const prisma = getPrismaClient();
+        const user = await prisma.user.findUnique({ where: { id: session.userId } });
+        if (user) req.user = user;
+      }
+    }
+
     if (!req.user || !req.user.id) {
       res.status(401).json({
         success: false,

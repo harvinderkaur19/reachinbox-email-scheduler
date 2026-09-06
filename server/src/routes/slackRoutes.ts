@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { resolveDevUser } from '../middleware/auth';
+import { authenticateUser } from '../middleware/auth';
 import {
   startOAuth,
   handleOAuthCallback,
@@ -9,12 +9,12 @@ import {
 
 const router = Router();
 
-// OAuth flow start & callback routes
-router.get('/oauth/start', resolveDevUser, startOAuth);
+// OAuth flow start & callback routes (Publicly reachable)
+router.get('/oauth/start', startOAuth);
 router.get('/oauth/callback', handleOAuthCallback);
 
-// Management routes
-router.post('/disconnect', resolveDevUser, disconnect);
-router.get('/status', resolveDevUser, getStatus);
+// Protected Slack application management endpoints
+router.post('/disconnect', authenticateUser, disconnect);
+router.get('/status', authenticateUser, getStatus);
 
 export default router;

@@ -8,6 +8,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   CLIENT_URL: z.string().default('http://localhost:5173'),
 
+  // Development User Isolation
+  DEV_USER_ID: z.string().default('dev-user-phase5a'),
+
   // Database Connection
   DATABASE_URL: z
     .string()
@@ -17,8 +20,10 @@ const envSchema = z.object({
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.string().default('6379').transform((val) => parseInt(val, 10)),
 
-  // Worker Configuration
+  // Worker & Rate Limit Configuration
   WORKER_CONCURRENCY: z.string().default('5').transform((val) => parseInt(val, 10)),
+  MIN_SEND_DELAY_MS: z.string().default('2000').transform((val) => parseInt(val, 10)),
+  MAX_EMAILS_PER_HOUR_PER_SENDER: z.string().default('200').transform((val) => parseInt(val, 10)),
 
   // Elasticsearch Connection
   ELASTICSEARCH_NODE: z.string().default('http://localhost:9200'),

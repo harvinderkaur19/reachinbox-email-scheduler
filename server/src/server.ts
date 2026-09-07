@@ -3,7 +3,7 @@ import { config } from './config';
 import { registerGracefulShutdown } from './utils/shutdown';
 import { ensureElasticIndex } from './services/elasticsearchService';
 import { createEmailWorker } from './workers/emailWorker';
-import { getTransporter } from './integrations/smtpIntegration';
+import { verifySmtpConnectionOnStartup } from './integrations/smtpIntegration';
 
 const PORT = config.PORT;
 
@@ -15,9 +15,9 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
   );
   console.log(`Elasticsearch Node: ${config.ELASTICSEARCH_NODE}`);
 
-  // Perform startup Ethereal SMTP verification
+  // Perform startup Ethereal SMTP verification across candidate ports
   try {
-    await getTransporter();
+    await verifySmtpConnectionOnStartup();
   } catch (sErr) {
     console.warn('⚠️ [Server] Startup SMTP verification warning:', (sErr as Error).message);
   }

@@ -3,6 +3,7 @@ import { config } from './config';
 import { registerGracefulShutdown } from './utils/shutdown';
 import { ensureElasticIndex } from './services/elasticsearchService';
 import { createEmailWorker } from './workers/emailWorker';
+import { getTransporter } from './integrations/smtpIntegration';
 
 const PORT = config.PORT;
 
@@ -13,6 +14,13 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
     `Redis: ${config.REDIS_URL ? config.REDIS_URL.replace(/:[^:@]+@/, ':****@') : `${config.REDIS_HOST}:${config.REDIS_PORT}`}`
   );
   console.log(`Elasticsearch Node: ${config.ELASTICSEARCH_NODE}`);
+
+  // Perform startup Ethereal SMTP verification
+  try {
+    await getTransporter();
+  } catch (sErr) {
+    console.warn('⚠️ [Server] Startup SMTP verification warning:', (sErr as Error).message);
+  }
 
   // Initialize Elasticsearch index and mapping idempotently (non-blocking)
   await ensureElasticIndex();

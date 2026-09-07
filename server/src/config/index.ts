@@ -38,6 +38,8 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASS: z.string().optional().default(''),
   SMTP_SECURE: z.string().default('false').transform((val) => val === 'true'),
+  ETHEREAL_EMAIL: z.string().optional().default(''),
+  ETHEREAL_PASSWORD: z.string().optional().default(''),
 
   // OAuth & Session Placeholders
   GOOGLE_CLIENT_ID: z.string().optional(),

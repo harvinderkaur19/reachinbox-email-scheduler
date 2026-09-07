@@ -159,13 +159,16 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
           }
         }
 
-        const result = await sendEmail({
-          from: fromAddress,
-          to: email.recipientEmail,
-          subject: email.subject,
-          body: cleanBody,
-          attachments: attachmentsPayload,
-        });
+        const result = await sendEmail(
+          {
+            from: fromAddress,
+            to: email.recipientEmail,
+            subject: email.subject,
+            body: cleanBody,
+            attachments: attachmentsPayload,
+          },
+          job.id
+        );
 
         const sentDate = new Date();
         console.log(`[SCHEDULE-TRACE] SMTP response: MessageId=${result.messageId}, PreviewUrl=${result.previewUrl || 'N/A'}`);

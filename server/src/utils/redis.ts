@@ -1,32 +1,28 @@
 import Redis from 'ioredis';
 import { config } from '../config';
 
-export const redisConnection = config.REDIS_URL
-  ? new Redis(config.REDIS_URL, { maxRetriesPerRequest: null, lazyConnect: true })
-  : {
-      host: config.REDIS_HOST,
-      port: config.REDIS_PORT,
+export const createRedisClient = (): Redis => {
+  if (config.REDIS_URL) {
+    return new Redis(config.REDIS_URL, {
       maxRetriesPerRequest: null,
-    };
+      enableReadyCheck: false,
+    });
+  }
+  return new Redis({
+    host: config.REDIS_HOST,
+    port: config.REDIS_PORT,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
+};
+
+export const redisConnection = createRedisClient();
 
 let redisInstance: Redis | null = null;
 
 export const getRedisClient = (): Redis => {
   if (!redisInstance) {
-    if (config.REDIS_URL) {
-      redisInstance = new Redis(config.REDIS_URL, {
-        lazyConnect: true,
-        maxRetriesPerRequest: null,
-      });
-    } else {
-      redisInstance = new Redis({
-        host: config.REDIS_HOST,
-        port: config.REDIS_PORT,
-        lazyConnect: true,
-        maxRetriesPerRequest: null,
-      });
-    }
-
+    redisInstance = createRedisClient();
     redisInstance.on('error', (err) => {
       console.error('⚠️ Redis Client Error:', err.message);
     });
@@ -47,3 +43,4 @@ export const disconnectRedis = async (): Promise<void> => {
     redisInstance = null;
   }
 };
+

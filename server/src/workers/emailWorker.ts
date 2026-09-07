@@ -1,7 +1,7 @@
 import { Worker, Job, DelayedError } from 'bullmq';
 import { EmailStatus } from '@prisma/client';
 import { config } from '../config';
-import { redisConnection } from '../utils/redis';
+import { createRedisClient } from '../utils/redis';
 import { EMAIL_SCHEDULER_QUEUE_NAME, EmailJobData } from '../types';
 import { getPrismaClient } from '../utils/prisma';
 import { sendEmail } from '../integrations/smtpIntegration';
@@ -12,14 +12,14 @@ import { updateElasticEmailStatus } from '../services/elasticsearchService';
 export const createEmailWorker = (): Worker<EmailJobData> => {
   const prisma = getPrismaClient();
 
-  console.log(`[Worker] Connected to Redis`);
-  console.log(`[Worker] Waiting for jobs on queue '${EMAIL_SCHEDULER_QUEUE_NAME}'...`);
+  console.log(`[SCHEDULE-TRACE] Worker started`);
+  console.log(`[SCHEDULE-TRACE] Worker ready (Queue '${EMAIL_SCHEDULER_QUEUE_NAME}')`);
 
   const worker = new Worker<EmailJobData>(
     EMAIL_SCHEDULER_QUEUE_NAME,
     async (job: Job<EmailJobData>) => {
       const { emailId } = job.data;
-      console.log(`[Worker] Processing job ID: ${job.id} (Attempt: ${job.attemptsMade + 1}) for emailId: ${emailId}`);
+      console.log(`[SCHEDULE-TRACE] Worker received job ID: ${job.id} (Attempt: ${job.attemptsMade + 1}) for emailId: ${emailId}`);
 
       // 1. Retrieve Email record
       const email = await prisma.email.findUnique({
@@ -28,13 +28,15 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
       });
 
       if (!email) {
-        console.warn(`[Worker] Job failed: Email record not found for emailId: ${emailId}`);
+        console.warn(`[SCHEDULE-TRACE] Job state: Failed — Email record not found for emailId: ${emailId}`);
         return;
       }
 
+      console.log(`[SCHEDULE-TRACE] Job state: Current DB status = ${email.status}`);
+
       // 2. Prevent duplicate sends if status is already SENT
       if (email.status === 'SENT') {
-        console.log(`[Worker] Email ${emailId} is already SENT. Skipping processing.`);
+        console.log(`[SCHEDULE-TRACE] Email ${emailId} is already SENT. Skipping processing.`);
         return;
       }
 
@@ -55,7 +57,7 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
 
       if (claimResult.count === 0) {
         console.log(
-          `[Worker] Email ${emailId} could not be claimed (current status: ${email.status}, attemptsMade: ${job.attemptsMade}). Skipping.`
+          `[SCHEDULE-TRACE] Email ${emailId} could not be claimed (current status: ${email.status}, attemptsMade: ${job.attemptsMade}). Skipping.`
         );
         return;
       }
@@ -72,7 +74,7 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
       } catch (redisErr) {
         const redisErrMsg = redisErr instanceof Error ? redisErr.message : String(redisErr);
         console.error(
-          `[Worker] Job failed: Redis rate limit enforcement error for sender ${senderAccountId}: ${redisErrMsg}`
+          `[SCHEDULE-TRACE] Job state: Redis rate limit enforcement error for sender ${senderAccountId}: ${redisErrMsg}`
         );
 
         // Reset DB status to FAILED so BullMQ retry can claim it cleanly
@@ -95,7 +97,7 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
       if (!rateLimitResult.allowed) {
         const rescheduleTimestamp = rateLimitResult.nextAvailableTimestamp || Date.now() + 3600000;
         console.log(
-          `[Worker] Hourly rate limit reached for sender ${senderAccountId} (count: ${rateLimitResult.currentCount}/${config.MAX_EMAILS_PER_HOUR_PER_SENDER}). Rescheduling email ${emailId} to next hour window: ${new Date(rescheduleTimestamp).toISOString()}`
+          `[SCHEDULE-TRACE] Hourly rate limit reached for sender ${senderAccountId}. Rescheduling email ${emailId} to: ${new Date(rescheduleTimestamp).toISOString()}`
         );
 
         // Attempt Slack Rate Limit Notification (fail-safe)
@@ -122,29 +124,38 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
       // 6. Handle Minimum Send Spacing Delay
       if (rateLimitResult.delayMs && rateLimitResult.delayMs > 0) {
         console.log(
-          `[Worker] Enforcing minimum send spacing of ${config.MIN_SEND_DELAY_MS}ms for sender ${senderAccountId}. Waiting ${rateLimitResult.delayMs}ms...`
+          `[SCHEDULE-TRACE] Enforcing send spacing delay of ${rateLimitResult.delayMs}ms...`
         );
         await new Promise((resolve) => setTimeout(resolve, rateLimitResult.delayMs));
       }
 
       // 7. Dispatch Email via SMTP
-      console.log(`[Worker] Email sending started for emailId: ${emailId}`);
+      console.log(`[SCHEDULE-TRACE] SMTP send started (to: ${email.recipientEmail}, subject: "${email.subject}")`);
       try {
         const fromAddress = email.senderAccount
           ? `"${email.senderAccount.name}" <${email.senderAccount.email}>`
           : undefined;
 
-        // Parse optional attachments stored as HTML comment in body
         let cleanBody = email.body;
         let attachmentsPayload: Array<{ filename: string; contentType?: string; content: string }> | undefined;
 
-        const attachmentMatch = email.body.match(/<!--ATTACHMENTS:(.*?)-->$/s);
-        if (attachmentMatch && attachmentMatch[1]) {
-          try {
-            attachmentsPayload = JSON.parse(attachmentMatch[1]);
-            cleanBody = email.body.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
-          } catch (pErr) {
-            console.warn(`[Worker] Failed to parse attachment JSON for email ${emailId}:`, pErr);
+        // Primary: read structured JSON from DB attachments column
+        if (email.attachments && Array.isArray(email.attachments) && (email.attachments as any[]).length > 0) {
+          attachmentsPayload = (email.attachments as any[]).map((att: any) => ({
+            filename: att.filename || att.name,
+            contentType: att.contentType || att.type,
+            content: att.content || att.base64,
+          }));
+        } else {
+          // Fallback for legacy records using HTML comment syntax
+          const attachmentMatch = email.body.match(/<!--ATTACHMENTS:(.*?)-->$/s);
+          if (attachmentMatch && attachmentMatch[1]) {
+            try {
+              attachmentsPayload = JSON.parse(attachmentMatch[1]);
+              cleanBody = email.body.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
+            } catch (pErr) {
+              console.warn(`[SCHEDULE-TRACE] Failed to parse legacy attachment JSON for email ${emailId}:`, pErr);
+            }
           }
         }
 
@@ -157,6 +168,7 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
         });
 
         const sentDate = new Date();
+        console.log(`[SCHEDULE-TRACE] SMTP response: MessageId=${result.messageId}, PreviewUrl=${result.previewUrl || 'N/A'}`);
 
         // 8. On Success: Update status = SENT, sentAt = now, clear failureReason
         await prisma.email.update({
@@ -171,13 +183,10 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
         // Sync SENT status to Elasticsearch (non-fatal)
         await updateElasticEmailStatus(emailId, 'SENT', { sentAt: sentDate });
 
-        console.log(`[Worker] Email sent successfully to ${email.recipientEmail} for emailId: ${emailId}. MessageId: ${result.messageId}`);
-        if (result.previewUrl) {
-          console.log(`[Worker] Ethereal Preview URL: ${result.previewUrl}`);
-        }
+        console.log(`[SCHEDULE-TRACE] Email marked SENT for emailId: ${emailId}`);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`[Worker] Job failed for email ${emailId}: ${errorMessage}`);
+        console.error(`[SCHEDULE-TRACE] Email marked FAILED with exact error for emailId ${emailId}: ${errorMessage}`);
 
         // On Failure: Update status = FAILED, set failureReason
         await prisma.email.update({
@@ -196,21 +205,20 @@ export const createEmailWorker = (): Worker<EmailJobData> => {
       }
     },
     {
-      connection: redisConnection,
+      connection: createRedisClient(),
       concurrency: config.WORKER_CONCURRENCY,
     }
   );
 
   worker.on('completed', (job) => {
-    console.log(`[Worker] Email sent successfully (Job ID: ${job.id})`);
+    console.log(`[SCHEDULE-TRACE] BullMQ Job completed (Job ID: ${job.id})`);
   });
 
   worker.on('failed', (job, err) => {
     if (err.name === 'DelayedError') {
-      // Normal rate limit rescheduling, not an error
       return;
     }
-    console.error(`[Worker] Job failed (Job ID: ${job?.id}):`, err.message);
+    console.error(`[SCHEDULE-TRACE] BullMQ Job failed (Job ID: ${job?.id}): ${err.message}`);
   });
 
   return worker;

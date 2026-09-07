@@ -180,5 +180,32 @@ export const updateScheduledEmailApi = async (
   return payload.data;
 };
 
+/**
+ * Fetches single scheduled/sent email details by ID via GET /api/emails/:id.
+ */
+export const getEmailByIdApi = async (emailId: string): Promise<any> => {
+  const url = `${API_BASE_URL}/api/emails/${emailId}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  });
+
+  if (response.status === 401) {
+    throw new ApiError('Unauthenticated session', 401);
+  }
+
+  const payload = await response.json();
+
+  if (!response.ok || !payload.success) {
+    throw new ApiError(
+      payload.message || `Failed to fetch email details (HTTP ${response.status})`,
+      response.status
+    );
+  }
+
+  return payload.data;
+};
+
 
 

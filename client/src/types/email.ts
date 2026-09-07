@@ -47,6 +47,7 @@ export interface EmailItem {
   recipientEmail: string;
   subject: string;
   body?: string;
+  attachments?: any[];
   status: EmailStatusType;
   scheduledAt?: string;
   sentAt?: string | null;

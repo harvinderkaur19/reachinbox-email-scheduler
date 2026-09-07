@@ -80,6 +80,8 @@ export const getScheduledEmailsService = async (
       id: true,
       recipientEmail: true,
       subject: true,
+      body: true,
+      attachments: true,
       scheduledAt: true,
       status: true,
       campaignId: true,
@@ -90,7 +92,7 @@ export const getScheduledEmailsService = async (
   const totalPages = Math.ceil(total / limit);
 
   return {
-    emails,
+    emails: emails as any[],
     pagination: {
       page,
       limit,
@@ -138,6 +140,8 @@ export const getSentEmailsService = async (
       id: true,
       recipientEmail: true,
       subject: true,
+      body: true,
+      attachments: true,
       sentAt: true,
       status: true,
       campaignId: true,
@@ -148,7 +152,7 @@ export const getSentEmailsService = async (
   const totalPages = Math.ceil(total / limit);
 
   return {
-    emails,
+    emails: emails as any[],
     pagination: {
       page,
       limit,
@@ -156,4 +160,25 @@ export const getSentEmailsService = async (
       totalPages,
     },
   };
+};
+
+/**
+ * Retrieves single email details by ID belonging strictly to the specified user ID.
+ */
+export const getEmailByIdService = async (userId: string, emailId: string) => {
+  const prisma = getPrismaClient();
+
+  const email = await prisma.email.findUnique({
+    where: { id: emailId },
+    include: {
+      campaign: true,
+      senderAccount: true,
+    },
+  });
+
+  if (!email || email.campaign.userId !== userId) {
+    throw new ServiceError('Email record not found or unauthorized', 404);
+  }
+
+  return email;
 };

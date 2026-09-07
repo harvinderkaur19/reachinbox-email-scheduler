@@ -5,6 +5,7 @@ import {
   parsePaginationParams,
   getScheduledEmailsService,
   getSentEmailsService,
+  getEmailByIdService,
   ServiceError as ReadServiceError,
 } from '../services/emailReadService';
 import { ApiResponse, ScheduleCampaignResponse } from '../types';
@@ -19,6 +20,7 @@ export const scheduleEmail = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    console.log(`[SCHEDULE-TRACE] Request received (POST /api/emails/schedule for user: ${req.user.id})`);
     const result: ScheduleCampaignResponse = await scheduleCampaignService(req.user.id, req.body);
 
     const hasQueueFailures = result.queueFailures && result.queueFailures.length > 0;
@@ -68,6 +70,7 @@ export const updateScheduledEmail = async (req: Request, res: Response): Promise
     }
 
     const emailId = req.params.id;
+    console.log(`[SCHEDULE-TRACE] Request received (PUT /api/emails/${emailId} for user: ${req.user.id})`);
     const result = await updateScheduledEmailService(req.user.id, emailId, req.body);
 
     res.status(200).json({
@@ -88,6 +91,40 @@ export const updateScheduledEmail = async (req: Request, res: Response): Promise
     res.status(500).json({
       success: false,
       message: 'Internal server error while updating scheduled email',
+    });
+  }
+};
+
+export const getEmailById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized: User context missing',
+      });
+      return;
+    }
+
+    const emailId = req.params.id;
+    const result = await getEmailByIdService(req.user.id, emailId);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof ReadServiceError || error instanceof SchedulingServiceError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+
+    console.error('[EmailController] Unexpected error in getEmailById:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching email details',
     });
   }
 };

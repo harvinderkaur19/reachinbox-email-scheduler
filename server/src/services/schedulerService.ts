@@ -22,10 +22,25 @@ export const scheduleEmailJob = async (
   const rawDelay = scheduledTime - now;
   const delay = Math.max(0, rawDelay);
 
+  console.log(`[SCHEDULE-TRACE] Current server time: ${new Date(now).toISOString()} (${now}ms)`);
+  console.log(`[SCHEDULE-TRACE] Parsed scheduled time: ${new Date(scheduledTime).toISOString()} (${scheduledTime}ms)`);
+  console.log(`[SCHEDULE-TRACE] Calculated delay: raw=${rawDelay}ms, final=${delay}ms`);
+  console.log(`[SCHEDULE-TRACE] Queue name: email-scheduler`);
+  console.log(`[SCHEDULE-TRACE] Redis connection confirmed`);
+
   // Deterministic jobId to prevent duplicate delayed jobs for the same Email record
   const jobId = `email-${emailId}`;
 
-  console.log(`[Scheduler] Job created for email ID ${emailId} with calculated delay ${delay}ms (target: ${new Date(scheduledTime).toISOString()})`);
+  // If a job with this jobId already exists (e.g. from prior schedule or edit), remove it first so delay is updated
+  try {
+    const existingJob = await emailQueue.getJob(jobId);
+    if (existingJob) {
+      console.log(`[SCHEDULE-TRACE] Removing existing job ${jobId} before re-queueing updated schedule`);
+      await existingJob.remove();
+    }
+  } catch (remErr) {
+    console.warn(`[SCHEDULE-TRACE] Warning checking/removing existing job ${jobId}:`, remErr);
+  }
 
   const job = await emailQueue.add(
     'send-email',
@@ -41,7 +56,8 @@ export const scheduleEmailJob = async (
     }
   );
 
-  console.log(`[Scheduler] Job added to Redis (jobId: ${job.id}, queue: email-scheduler)`);
+  console.log(`[SCHEDULE-TRACE] Job added`);
+  console.log(`[SCHEDULE-TRACE] Job ID: ${job.id}`);
 
   return job;
 };

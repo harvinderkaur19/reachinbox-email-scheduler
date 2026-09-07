@@ -5,6 +5,7 @@ import { scheduleEmailSchema } from '../utils/validation/emailValidation';
 import {
   scheduleEmail,
   updateScheduledEmail,
+  getEmailById,
   searchEmails,
   getScheduledEmails,
   getSentEmails,
@@ -18,6 +19,13 @@ router.post(
   authenticateUser,
   validateRequestBody(scheduleEmailSchema),
   scheduleEmail
+);
+
+// GET /api/emails/:id
+router.get(
+  '/:id',
+  authenticateUser,
+  getEmailById
 );
 
 // PUT /api/emails/:id

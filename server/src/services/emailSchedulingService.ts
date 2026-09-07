@@ -25,6 +25,7 @@ export const scheduleCampaignService = async (
   userId: string,
   input: ScheduleEmailInput
 ): Promise<ScheduleCampaignResponse> => {
+  console.log(`[SCHEDULE-TRACE] Request received in scheduleCampaignService for user: ${userId}`);
   const prisma = getPrismaClient();
 
   // 1. Verify SenderAccount
@@ -41,6 +42,7 @@ export const scheduleCampaignService = async (
   }
 
   const startMs = new Date(input.startTime).getTime();
+  console.log(`[SCHEDULE-TRACE] Parsed scheduled time: ${new Date(startMs).toISOString()} (${startMs}ms)`);
 
   // 2. Perform Atomic Database Transaction (Campaign + Email records)
   const { campaign, createdEmails } = await prisma.$transaction(async (tx) => {
@@ -57,26 +59,23 @@ export const scheduleCampaignService = async (
     });
 
     const hasAttachments = Array.isArray(input.attachments) && input.attachments.length > 0;
-    const finalBody = hasAttachments
-      ? `${input.body}\n\n<!--ATTACHMENTS:${JSON.stringify(input.attachments)}-->`
-      : input.body;
+    const attachmentsJson = hasAttachments ? (input.attachments as any) : null;
 
     const emailsToCreate = input.recipients.map((recipient, index) => {
-      // Server-side calculation: startTime + index * delayBetweenEmails (in seconds)
       const scheduledTimeMs = startMs + index * input.delayBetweenEmails * 1000;
       return {
         campaignId: newCampaign.id,
         senderAccountId: senderAccount.id,
         recipientEmail: recipient,
         subject: input.subject,
-        body: finalBody,
+        body: input.body,
+        attachments: attachmentsJson,
         scheduledAt: new Date(scheduledTimeMs),
         status: 'SCHEDULED' as const,
         idempotencyKey: `email-${newCampaign.id}-${recipient}-${index}`,
         attemptCount: 0,
       };
     });
-
 
     // Create Email records in database
     await tx.email.createMany({
@@ -90,6 +89,8 @@ export const scheduleCampaignService = async (
 
     return { campaign: newCampaign, createdEmails: emails };
   });
+
+  console.log(`[SCHEDULE-TRACE] Email saved to DB (Count: ${createdEmails.length}, Campaign ID: ${campaign.id})`);
 
   // 3. Enqueue BullMQ delayed jobs after DB transaction succeeds
   const scheduledEmails: ScheduledEmailItem[] = [];
@@ -108,7 +109,7 @@ export const scheduleCampaignService = async (
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error(
-        `[EmailSchedulingService] Queue scheduling failed for email ${email.id} (recipient: ${email.recipientEmail}):`,
+        `[SCHEDULE-TRACE] Queue scheduling failed for email ${email.id} (recipient: ${email.recipientEmail}):`,
         errorMsg
       );
       queueFailures.push({
@@ -147,6 +148,7 @@ export const updateScheduledEmailService = async (
     attachments?: Array<{ filename: string; contentType?: string; content: string }>;
   }
 ) => {
+  console.log(`[SCHEDULE-TRACE] Update request received for email ID: ${emailId}`);
   const prisma = getPrismaClient();
 
   const email = await prisma.email.findUnique({
@@ -162,49 +164,40 @@ export const updateScheduledEmailService = async (
     throw new ServiceError('Cannot edit an email that is currently being processed or already sent', 400);
   }
 
-  let finalBody = email.body;
-
-  // Handle body update & attachment preservation rules
-  if (input.body !== undefined || input.attachments !== undefined) {
-    // Determine existing attachments if input.attachments is not explicitly provided
-    let currentAttachments: any[] = [];
-    const existingMatch = email.body.match(/<!--ATTACHMENTS:(.*?)-->$/s);
-    const cleanTextBody = email.body.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
-
-    if (existingMatch && existingMatch[1]) {
-      try {
-        currentAttachments = JSON.parse(existingMatch[1]);
-      } catch (err) {}
-    }
-
-    const textToUse = input.body !== undefined ? input.body.trim() : cleanTextBody;
-    const attachmentsToUse = input.attachments !== undefined ? input.attachments : currentAttachments;
-
-    finalBody = attachmentsToUse && attachmentsToUse.length > 0
-      ? `${textToUse}\n\n<!--ATTACHMENTS:${JSON.stringify(attachmentsToUse)}-->`
-      : textToUse;
-  }
-
+  // Preserve fields not explicitly provided in update request
+  const updatedSubject = input.subject !== undefined && input.subject !== null ? input.subject.trim() : email.subject;
+  const updatedBody = input.body !== undefined && input.body !== null ? input.body.trim() : email.body;
+  const updatedRecipientEmail =
+    input.recipientEmail !== undefined && input.recipientEmail !== null
+      ? input.recipientEmail.trim()
+      : email.recipientEmail;
   const updatedScheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : email.scheduledAt;
+
+  // Handle attachment preservation
+  let updatedAttachmentsJson: any = email.attachments;
+  if (input.attachments !== undefined) {
+    updatedAttachmentsJson = Array.isArray(input.attachments) && input.attachments.length > 0 ? input.attachments : null;
+  }
 
   // Update MySQL record
   const updatedEmail = await prisma.email.update({
     where: { id: emailId },
     data: {
-      subject: input.subject !== undefined ? input.subject.trim() : email.subject,
-      body: finalBody,
-      recipientEmail: input.recipientEmail !== undefined ? input.recipientEmail.trim() : email.recipientEmail,
+      subject: updatedSubject,
+      body: updatedBody,
+      recipientEmail: updatedRecipientEmail,
+      attachments: updatedAttachmentsJson,
       scheduledAt: updatedScheduledAt,
       status: 'SCHEDULED',
       failureReason: null,
     },
   });
 
-  console.log(`[SCHEDULE] Campaign updated in database for email ID ${emailId}`);
+  console.log(`[SCHEDULE-TRACE] Email saved to DB for email ID ${emailId} (Subject: "${updatedSubject}")`);
 
   // Re-queue updated job
   const job = await scheduleEmailJob(emailId, updatedScheduledAt);
-  console.log(`[SCHEDULE] Job ID ${job.id} re-queued for scheduled timestamp ${updatedScheduledAt.toISOString()}`);
+  console.log(`[SCHEDULE-TRACE] Job ID ${job.id} re-queued for scheduled timestamp ${updatedScheduledAt.toISOString()}`);
 
   return updatedEmail;
 };

@@ -5,7 +5,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ComposePage } from './pages/ComposePage';
 import { EmailDetailPage } from './pages/EmailDetailPage';
 import { API_BASE_URL } from './config';
-import { getScheduledEmails, getSentEmails, searchEmails, scheduleEmails, ApiError, getAuthHeaders } from './services/emailService';
+import { getScheduledEmails, getSentEmails, searchEmails, scheduleEmails, getEmailByIdApi, ApiError, getAuthHeaders } from './services/emailService';
 import { Loader2 } from 'lucide-react';
 
 export function App() {
@@ -237,13 +237,23 @@ export function App() {
     setView('compose');
   };
 
-  const handleStartEdit = (email: EmailItem) => {
-    setEditingEmail(email);
+  const handleStartEdit = async (email: EmailItem) => {
+    try {
+      const fullEmail = await getEmailByIdApi(email.id);
+      setEditingEmail(fullEmail || email);
+    } catch (err) {
+      setEditingEmail(email);
+    }
     setView('compose');
   };
 
-  const handleSelectEmail = (email: EmailItem) => {
-    setSelectedEmail(email);
+  const handleSelectEmail = async (email: EmailItem) => {
+    try {
+      const fullEmail = await getEmailByIdApi(email.id);
+      setSelectedEmail(fullEmail || email);
+    } catch (err) {
+      setSelectedEmail(email);
+    }
     setView('detail');
   };
 

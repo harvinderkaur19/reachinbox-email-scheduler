@@ -34,12 +34,20 @@ export const EmailDetail: FC<EmailDetailProps> = ({
   let cleanBody = email.body || '';
   let attachments: Array<{ filename: string; contentType?: string; content: string }> = [];
 
-  const attachmentMatch = cleanBody.match(/<!--ATTACHMENTS:(.*?)-->$/s);
-  if (attachmentMatch && attachmentMatch[1]) {
-    try {
-      attachments = JSON.parse(attachmentMatch[1]);
-      cleanBody = cleanBody.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
-    } catch (err) {}
+  if (email.attachments && Array.isArray(email.attachments) && email.attachments.length > 0) {
+    attachments = email.attachments.map((att: any) => ({
+      filename: att.filename || att.name,
+      contentType: att.contentType || att.type,
+      content: att.content || att.base64,
+    }));
+  } else {
+    const attachmentMatch = cleanBody.match(/<!--ATTACHMENTS:(.*?)-->$/s);
+    if (attachmentMatch && attachmentMatch[1]) {
+      try {
+        attachments = JSON.parse(attachmentMatch[1]);
+        cleanBody = cleanBody.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
+      } catch (err) {}
+    }
   }
 
   const downloadAttachment = (att: { filename: string; contentType?: string; content: string }) => {

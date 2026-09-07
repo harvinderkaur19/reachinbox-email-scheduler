@@ -54,12 +54,16 @@ export const ComposeForm: FC<ComposeFormProps> = ({
     let cleanBody = editingEmail.body || '';
     let parsedAttachments: any[] = [];
 
-    const attachmentMatch = cleanBody.match(/<!--ATTACHMENTS:(.*?)-->$/s);
-    if (attachmentMatch && attachmentMatch[1]) {
-      try {
-        parsedAttachments = JSON.parse(attachmentMatch[1]);
-        cleanBody = cleanBody.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
-      } catch (e) {}
+    if (editingEmail.attachments && Array.isArray(editingEmail.attachments) && editingEmail.attachments.length > 0) {
+      parsedAttachments = editingEmail.attachments;
+    } else {
+      const attachmentMatch = cleanBody.match(/<!--ATTACHMENTS:(.*?)-->$/s);
+      if (attachmentMatch && attachmentMatch[1]) {
+        try {
+          parsedAttachments = JSON.parse(attachmentMatch[1]);
+          cleanBody = cleanBody.replace(/<!--ATTACHMENTS:(.*?)-->$/s, '').trim();
+        } catch (e) {}
+      }
     }
 
     return {
@@ -67,10 +71,10 @@ export const ComposeForm: FC<ComposeFormProps> = ({
       subject: editingEmail.subject,
       body: cleanBody,
       attachments: parsedAttachments.map((att) => ({
-        name: att.filename,
-        size: Math.round((att.content.length * 3) / 4),
-        type: att.contentType || 'application/octet-stream',
-        base64: att.content,
+        name: att.filename || att.name,
+        size: Math.round(((att.content || att.base64 || '').length * 3) / 4),
+        type: att.contentType || att.type || 'application/octet-stream',
+        base64: att.content || att.base64 || '',
       })),
       scheduledAt: editingEmail.scheduledAt || new Date().toISOString(),
     };

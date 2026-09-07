@@ -89,6 +89,7 @@ model Email {
   recipientEmail  String
   subject         String
   body            String      @db.Text
+  attachments     Json?
   scheduledAt     DateTime
   sentAt          DateTime?
   status          EmailStatus @default(SCHEDULED)

@@ -13,7 +13,7 @@ import {
 
 const router = Router();
 
-// POST /api/emails/schedule
+// 1. Static GET & Action Endpoints (MUST BE DEFINED BEFORE /:id)
 router.post(
   '/schedule',
   authenticateUser,
@@ -21,39 +21,35 @@ router.post(
   scheduleEmail
 );
 
-// GET /api/emails/:id
-router.get(
-  '/:id',
-  authenticateUser,
-  getEmailById
-);
-
-// PUT /api/emails/:id
-router.put(
-  '/:id',
-  authenticateUser,
-  updateScheduledEmail
-);
-
-// GET /api/emails/search?q=<query>
-router.get(
-  '/search',
-  authenticateUser,
-  searchEmails
-);
-
-// GET /api/emails/scheduled?page=1&limit=20
 router.get(
   '/scheduled',
   authenticateUser,
   getScheduledEmails
 );
 
-// GET /api/emails/sent?page=1&limit=20
 router.get(
   '/sent',
   authenticateUser,
   getSentEmails
+);
+
+router.get(
+  '/search',
+  authenticateUser,
+  searchEmails
+);
+
+// 2. Dynamic parameterized endpoints (MUST BE DEFINED AFTER ALL STATIC ROUTES)
+router.get(
+  '/:id',
+  authenticateUser,
+  getEmailById
+);
+
+router.put(
+  '/:id',
+  authenticateUser,
+  updateScheduledEmail
 );
 
 export default router;

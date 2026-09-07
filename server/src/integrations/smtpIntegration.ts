@@ -27,8 +27,7 @@ export const getTransporter = async (): Promise<Transporter> => {
   if (!transporterPromise) {
     transporterPromise = (async () => {
       const host = process.env.SMTP_HOST || config.SMTP_HOST || 'smtp.ethereal.email';
-      const port = Number(process.env.SMTP_PORT || config.SMTP_PORT || 587);
-      const secure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : Boolean(config.SMTP_SECURE);
+      const port = Number(process.env.SMTP_PORT || config.SMTP_PORT || 2525);
 
       let user = process.env.SMTP_USER || process.env.ETHEREAL_EMAIL || config.SMTP_USER || config.ETHEREAL_EMAIL || '';
       let pass = process.env.SMTP_PASS || process.env.ETHEREAL_PASSWORD || config.SMTP_PASS || config.ETHEREAL_PASSWORD || '';
@@ -36,7 +35,7 @@ export const getTransporter = async (): Promise<Transporter> => {
       const hasCreds = Boolean(user && pass && user.trim() !== '' && pass.trim() !== '');
 
       console.log(`[SMTP] Provider: Ethereal`);
-      console.log(`[SMTP] Host configured: YES (${host}:${port})`);
+      console.log(`[SMTP] Host: ${host}, Port: ${port}`);
       console.log(`[SMTP] Credentials configured: ${hasCreds ? 'YES' : 'NO'}`);
 
       if (!hasCreds) {
@@ -54,17 +53,20 @@ export const getTransporter = async (): Promise<Transporter> => {
       const transporter = nodemailer.createTransport({
         host,
         port,
-        secure,
+        secure: false,
         auth: {
           user: user ? user.trim() : '',
           pass: pass ? pass.trim() : '',
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
       });
 
-      // Temporary startup SMTP verification
+      // Startup SMTP verification
       try {
         await transporter.verify();
-        console.log(`[SMTP] Startup verification: Ethereal SMTP connectivity SUCCEEDED (User: ${user ? user.trim() : 'none'})`);
+        console.log(`[SMTP] Startup verification: Ethereal SMTP connectivity SUCCEEDED (${host}:${port})`);
       } catch (verifyErr) {
         console.error(`[SMTP] Startup verification: Ethereal SMTP connectivity FAILED: ${(verifyErr as Error).message}`);
       }

@@ -308,7 +308,7 @@ export const ComposeForm: FC<ComposeFormProps> = ({
 
 
   return (
-    <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+    <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col min-h-[500px] sm:min-h-[600px] w-full max-w-full">
       {/* Hidden File Input for CSV/TXT Recipient List Upload */}
       <input
         type="file"
@@ -328,23 +328,23 @@ export const ComposeForm: FC<ComposeFormProps> = ({
       />
 
       {/* Top Header Controls Bar */}
-      <div className="px-6 py-3.5 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="px-3 sm:px-6 py-3 sm:py-3.5 border-b border-gray-200 bg-gray-50/50 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={onBack}
             disabled={isSubmitting}
-            className="p-1.5 rounded-md hover:bg-gray-200/60 text-gray-600 transition-colors flex items-center gap-1.5 text-xs font-semibold disabled:opacity-50"
+            className="p-1.5 rounded-md hover:bg-gray-200/60 text-gray-600 transition-colors flex items-center gap-1.5 text-xs font-semibold disabled:opacity-50 shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
           </button>
-          <div className="h-4 w-px bg-gray-200" />
-          <h2 className="text-base font-bold text-gray-900 tracking-tight">
+          <div className="h-4 w-px bg-gray-200 shrink-0" />
+          <h2 className="text-sm sm:text-base font-bold text-gray-900 tracking-tight truncate">
             Compose New Email
           </h2>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Functional Attachment Button */}
           <button
             type="button"
@@ -426,9 +426,9 @@ export const ComposeForm: FC<ComposeFormProps> = ({
 
       {/* Form Error Banner */}
       {formError && (
-        <div className="px-6 py-2.5 bg-red-50 border-b border-red-200 flex items-center gap-2 text-xs text-red-700 font-semibold">
+        <div className="px-3 sm:px-6 py-2.5 bg-red-50 border-b border-red-200 flex items-center gap-2 text-xs text-red-700 font-semibold">
           <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-          <span className="flex-1">{formError}</span>
+          <span className="flex-1 min-w-0">{formError}</span>
           <button
             onClick={() => setFormError(null)}
             className="text-red-500 hover:text-red-700 p-0.5"
@@ -440,8 +440,8 @@ export const ComposeForm: FC<ComposeFormProps> = ({
 
       {/* Scheduled Info Banner */}
       {scheduledAt && (
-        <div className="px-6 py-2 bg-green-50 border-b border-green-200 flex items-center justify-between text-xs text-green-900 font-medium">
-          <span>
+        <div className="px-3 sm:px-6 py-2 bg-green-50 border-b border-green-200 flex items-center justify-between text-xs text-green-900 font-medium flex-wrap gap-1">
+          <span className="truncate min-w-0">
             Scheduled Start Time:{' '}
             {new Date(scheduledAt).toLocaleString('en-US', {
               month: 'short',
@@ -455,7 +455,7 @@ export const ComposeForm: FC<ComposeFormProps> = ({
           <button
             type="button"
             onClick={() => setShowSendLater(true)}
-            className="text-green-700 underline hover:text-green-900 text-[11px]"
+            className="text-green-700 underline hover:text-green-900 text-[11px] shrink-0"
           >
             Change schedule
           </button>
@@ -464,17 +464,17 @@ export const ComposeForm: FC<ComposeFormProps> = ({
 
       {/* Uploaded File Banner */}
       {uploadedFileInfo && (
-        <div className="px-6 py-2 bg-blue-50 border-b border-blue-200 flex items-center justify-between text-xs text-blue-900 font-medium">
-          <div className="flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-blue-600" />
-            <span>
+        <div className="px-3 sm:px-6 py-2 bg-blue-50 border-b border-blue-200 flex items-center justify-between text-xs text-blue-900 font-medium flex-wrap gap-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span className="truncate">
               Loaded <strong>{uploadedFileInfo.count}</strong> email addresses from{' '}
               <strong>{uploadedFileInfo.fileName}</strong>
             </span>
           </div>
           <button
             onClick={() => setUploadedFileInfo(null)}
-            className="text-blue-700 underline hover:text-blue-900 text-[11px]"
+            className="text-blue-700 underline hover:text-blue-900 text-[11px] shrink-0"
           >
             Dismiss
           </button>
@@ -483,22 +483,22 @@ export const ComposeForm: FC<ComposeFormProps> = ({
 
       {/* Attached Files Chips Banner */}
       {attachedFiles.length > 0 && (
-        <div className="px-6 py-2 bg-purple-50 border-b border-purple-200 flex items-center gap-2 flex-wrap text-xs text-purple-900 font-medium">
+        <div className="px-3 sm:px-6 py-2 bg-purple-50 border-b border-purple-200 flex items-center gap-2 flex-wrap text-xs text-purple-900 font-medium">
           <Paperclip className="w-3.5 h-3.5 text-purple-600 shrink-0" />
           <span className="shrink-0 font-bold">Attachments ({attachedFiles.length}):</span>
           {attachedFiles.map((file) => (
             <div
               key={file.name}
-              className="inline-flex items-center gap-1.5 bg-white border border-purple-200 text-purple-800 px-2 py-0.5 rounded shadow-2xs text-xs font-semibold"
+              className="inline-flex items-center gap-1.5 bg-white border border-purple-200 text-purple-800 px-2 py-0.5 rounded shadow-2xs text-xs font-semibold max-w-full min-w-0"
             >
-              <span className="truncate max-w-[150px]">{file.name}</span>
-              <span className="text-[10px] text-purple-500 font-normal">
+              <span className="truncate max-w-[120px] sm:max-w-[150px]">{file.name}</span>
+              <span className="text-[10px] text-purple-500 font-normal shrink-0">
                 ({(file.size / 1024).toFixed(1)} KB)
               </span>
               <button
                 type="button"
                 onClick={() => handleRemoveAttachment(file.name)}
-                className="text-purple-400 hover:text-purple-700 p-0.5 rounded cursor-pointer"
+                className="text-purple-400 hover:text-purple-700 p-0.5 rounded cursor-pointer shrink-0"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -509,24 +509,24 @@ export const ComposeForm: FC<ComposeFormProps> = ({
 
 
       {/* Form Fields */}
-      <div className="p-6 space-y-4 flex-1 flex flex-col">
+      <div className="p-3 sm:p-6 space-y-3 sm:space-y-4 flex-1 flex flex-col min-w-0 max-w-full">
         {/* From Field */}
-        <div className="flex items-center border-b border-gray-100 pb-3">
-          <span className="w-24 text-xs font-bold text-gray-500 uppercase tracking-wider">
+        <div className="flex flex-col sm:flex-row sm:items-center border-b border-gray-100 pb-3 gap-1 sm:gap-0">
+          <span className="w-16 sm:w-24 text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">
             From:
           </span>
-          <span className="text-sm font-semibold text-gray-800">
+          <span className="text-xs sm:text-sm font-semibold text-gray-800 truncate">
             {activeSender ? `${activeSender.name} <${activeSender.email}>` : user.email}
           </span>
         </div>
 
         {/* To Field with Recipient Chips & Upload List Button */}
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-          <div className="flex items-center gap-2 flex-1 flex-wrap">
-            <span className="w-24 text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-b border-gray-100 pb-3 gap-2 sm:gap-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1 min-w-0">
+            <span className="w-16 sm:w-24 text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">
               To:
             </span>
-            <div className="flex items-center gap-1.5 flex-wrap flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
               {recipients.map((r) => (
                 <RecipientChip
                   key={r}
@@ -546,7 +546,7 @@ export const ComposeForm: FC<ComposeFormProps> = ({
                   }
                 }}
                 placeholder={recipients.length === 0 ? 'Type email & press Enter or comma...' : 'Add email...'}
-                className="text-sm text-gray-800 placeholder-gray-400 focus:outline-none min-w-[180px] flex-1 py-1"
+                className="text-xs sm:text-sm text-gray-800 placeholder-gray-400 focus:outline-none min-w-[120px] flex-1 py-1"
               />
             </div>
           </div>
@@ -555,7 +555,7 @@ export const ComposeForm: FC<ComposeFormProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="text-xs font-semibold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            className="text-xs font-semibold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer self-start sm:self-auto"
             title="Upload CSV or TXT recipient list"
           >
             <Upload className="w-3.5 h-3.5 text-green-600" />
@@ -564,8 +564,8 @@ export const ComposeForm: FC<ComposeFormProps> = ({
         </div>
 
         {/* Subject Field */}
-        <div className="flex items-center border-b border-gray-100 pb-3">
-          <span className="w-24 text-xs font-bold text-gray-500 uppercase tracking-wider">
+        <div className="flex flex-col sm:flex-row sm:items-center border-b border-gray-100 pb-3 gap-1 sm:gap-0">
+          <span className="w-16 sm:w-24 text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">
             Subject:
           </span>
           <input
@@ -573,12 +573,12 @@ export const ComposeForm: FC<ComposeFormProps> = ({
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Email subject..."
-            className="w-full text-sm font-semibold text-gray-900 placeholder-gray-400 focus:outline-none py-1"
+            className="w-full text-xs sm:text-sm font-semibold text-gray-900 placeholder-gray-400 focus:outline-none py-1"
           />
         </div>
 
         {/* Delay & Hourly Limit Configuration Numeric Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/70 p-3.5 rounded-md border border-gray-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-gray-50/70 p-3 sm:p-3.5 rounded-md border border-gray-200">
           <div>
             <label className="text-xs font-semibold text-gray-700 block mb-1">
               Delay between 2 emails (seconds)
@@ -588,7 +588,7 @@ export const ComposeForm: FC<ComposeFormProps> = ({
               min={0}
               value={delayBetweenEmails}
               onChange={(e) => setDelayBetweenEmails(parseInt(e.target.value, 10) || 0)}
-              className="w-full bg-white border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+              className="w-full bg-white border border-gray-300 rounded-md px-3 py-1.5 text-xs sm:text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
             />
           </div>
 
@@ -601,19 +601,19 @@ export const ComposeForm: FC<ComposeFormProps> = ({
               min={1}
               value={hourlyLimit}
               onChange={(e) => setHourlyLimit(parseInt(e.target.value, 10) || 1)}
-              className="w-full bg-white border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+              className="w-full bg-white border border-gray-300 rounded-md px-3 py-1.5 text-xs sm:text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
             />
           </div>
         </div>
 
         {/* Message Editor Area */}
-        <div className="flex-1 flex flex-col border border-gray-200 rounded-md overflow-hidden min-h-[220px]">
+        <div className="flex-1 flex flex-col border border-gray-200 rounded-md overflow-hidden min-h-[180px] sm:min-h-[220px] min-w-0 max-w-full">
           <EditorToolbar />
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Write your email body here..."
-            className="flex-1 w-full p-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none resize-none font-sans leading-relaxed"
+            className="flex-1 w-full p-3 sm:p-4 text-xs sm:text-sm text-gray-800 placeholder-gray-400 focus:outline-none resize-none font-sans leading-relaxed min-w-0"
           />
         </div>
       </div>

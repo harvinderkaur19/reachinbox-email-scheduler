@@ -33,7 +33,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between h-screen sticky top-0 shrink-0 select-none">
+    <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col justify-between h-screen sticky top-0 shrink-0 select-none">
       <div className="flex flex-col">
         {/* Top Wordmark Branding - "ONE" Branding per Figma spec */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">

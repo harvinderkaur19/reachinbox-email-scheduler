@@ -62,26 +62,26 @@ export const EmailDetail: FC<EmailDetailProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+    <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden w-full max-w-full">
       {/* Top Action Header Bar */}
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-        <div className="flex items-center gap-3">
+      <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 bg-gray-50/50">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={onBack}
-            className="p-1.5 rounded-md hover:bg-gray-200/60 text-gray-600 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+            className="p-1.5 rounded-md hover:bg-gray-200/60 text-gray-600 transition-colors flex items-center gap-1.5 text-xs font-semibold shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to list</span>
           </button>
-          <div className="h-4 w-px bg-gray-200" />
+          <div className="h-4 w-px bg-gray-200 shrink-0" />
           <Badge status={email.status} />
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           {isScheduled && onEdit && (
             <button
               onClick={() => onEdit(email)}
-              className="mr-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="mr-1 sm:mr-2 px-2.5 sm:px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Edit className="w-3.5 h-3.5" />
               <span>Edit Schedule</span>
@@ -104,29 +104,29 @@ export const EmailDetail: FC<EmailDetailProps> = ({
       </div>
 
       {/* Main Email Content */}
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         {/* Subject Title */}
-        <h2 className="text-xl font-bold text-gray-900 mb-6 tracking-tight">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 tracking-tight">
           {email.subject}
         </h2>
 
         {/* Sender & Recipient Metadata */}
-        <div className="flex items-start justify-between border-b border-gray-100 pb-6 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between border-b border-gray-100 pb-4 sm:pb-6 mb-4 sm:mb-6 gap-3 sm:gap-0">
           <div className="flex items-start gap-3">
             <Avatar name={user.name} src={user.avatarUrl} size="lg" />
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-bold text-gray-900">{user.name}</span>
                 <span className="text-xs text-gray-500">&lt;{user.email}&gt;</span>
               </div>
-              <p className="text-xs text-gray-600 mt-0.5">
+              <p className="text-xs text-gray-600 mt-0.5 truncate">
                 <span className="font-semibold text-gray-700">To:</span>{' '}
                 {email.recipientEmail}
               </p>
             </div>
           </div>
 
-          <div className="text-right">
+          <div className="sm:text-right">
             <span className="text-xs text-gray-500 font-medium">
               {isScheduled ? `Scheduled for: ${email.scheduledAt}` : `Sent at: ${email.sentAt || email.createdAt}`}
             </span>
@@ -165,7 +165,7 @@ export const EmailDetail: FC<EmailDetailProps> = ({
               {attachments.map((att, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between p-3 border border-gray-200 rounded-md bg-gray-50/50 hover:bg-gray-50 w-64 transition-colors"
+                  className="flex items-center justify-between p-3 border border-gray-200 rounded-md bg-gray-50/50 hover:bg-gray-50 w-full sm:w-64 transition-colors"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="p-2 rounded bg-green-100 text-green-700 shrink-0">
@@ -183,7 +183,7 @@ export const EmailDetail: FC<EmailDetailProps> = ({
                   <button
                     type="button"
                     onClick={() => downloadAttachment(att)}
-                    className="p-1 text-gray-400 hover:text-green-600 transition-colors cursor-pointer"
+                    className="p-1 text-gray-400 hover:text-green-600 transition-colors cursor-pointer shrink-0"
                     title="Download attachment"
                   >
                     <Download className="w-4 h-4" />

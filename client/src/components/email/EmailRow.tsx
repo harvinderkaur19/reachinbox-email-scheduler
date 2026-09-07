@@ -32,30 +32,30 @@ export const EmailRow: FC<EmailRowProps> = ({
   return (
     <div
       onClick={onClick}
-      className="group flex items-center justify-between px-4 py-3.5 border-b border-gray-100 hover:bg-green-50/40 transition-colors cursor-pointer select-none"
+      className="group flex flex-col sm:flex-row sm:items-center justify-between px-3 sm:px-4 py-3 sm:py-3.5 border-b border-gray-100 hover:bg-green-50/40 transition-colors cursor-pointer select-none gap-2 sm:gap-4 min-w-0"
     >
-      <div className="flex items-center gap-4 min-w-0 flex-1">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
         {/* Status Badge */}
-        <div className="shrink-0 w-24">
+        <div className="shrink-0 w-20 sm:w-24">
           <Badge status={email.status} />
         </div>
 
         {/* Recipient */}
-        <div className="w-48 shrink-0 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">
+        <div className="w-full sm:w-48 shrink-0 min-w-0">
+          <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
             To: {email.recipientEmail}
           </p>
         </div>
 
         {/* Subject & Preview */}
         <div className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-900 truncate shrink-0 max-w-xs">
+          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate shrink-0 max-w-[150px] sm:max-w-xs">
             {email.subject}
           </span>
           {email.body && (
             <>
-              <span className="text-xs text-gray-400 font-medium">--</span>
-              <span className="text-xs text-gray-500 truncate min-w-0">
+              <span className="hidden sm:inline text-xs text-gray-400 font-medium">--</span>
+              <span className="hidden sm:inline text-xs text-gray-500 truncate min-w-0">
                 {email.body}
               </span>
             </>
@@ -64,8 +64,8 @@ export const EmailRow: FC<EmailRowProps> = ({
       </div>
 
       {/* Date & Action Icons */}
-      <div className="flex items-center gap-3 shrink-0 ml-4">
-        <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
+      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 sm:ml-4 w-full sm:w-auto">
+        <span className="text-[11px] sm:text-xs text-gray-500 font-medium whitespace-nowrap">
           {formattedTime}
         </span>
         <button
